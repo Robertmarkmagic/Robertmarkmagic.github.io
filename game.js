@@ -503,23 +503,46 @@ function cloudConfig() {
   return window.MARKET_FOUNDRY_SUPABASE || {};
 }
 
-function cloudReady() {
+function cloudConfigured() {
   const config=cloudConfig();
-  return Boolean(window.supabase && config.url && config.anonKey && supabaseClient);
+  return Boolean(window.supabase && config.url && config.anonKey);
 }
 
-function updateCloudStatus(text) {
+function cloudReady() {
+  return Boolean(cloudConfigured() && supabaseClient);
+}
+
+function updateCloudStatus(text, good=null) {
   const status=document.querySelector("#cloud-status");
   if (!status) return;
-  if (text) { status.textContent=text; return; }
   const config=cloudConfig();
-  if (!window.supabase) status.textContent="Cloud library could not load. Local saves still work.";
-  else if (!config.url || !config.anonKey) status.textContent="Cloud saves are not configured yet. Local saves still work.";
-  else if (currentUser) status.textContent=`Signed in as ${currentUser.email}. Cloud saves are ready.`;
-  else status.textContent="Cloud is configured. Sign in or create an account.";
+  let next=text;
+  if (!next) {
+    if (!window.supabase) next="Cloud library could not load. Local saves still work.";
+    else if (!config.url || !config.anonKey) next="Setup required: add your Supabase URL and anon key to enable email signup.";
+    else if (currentUser) next=`Signed in as ${currentUser.email}. Cloud saves are ready.`;
+    else next="Cloud is configured. Sign in or create an account.";
+  }
+  status.textContent=next;
+  status.className=good===null ? "" : good ? "up" : "down";
+  const configured=cloudConfigured();
+  document.querySelector("#auth-sign-up").disabled=false;
+  document.querySelector("#auth-sign-in").disabled=false;
   document.querySelector("#auth-sign-out").disabled=!currentUser;
-  document.querySelector("#cloud-save").disabled=!currentUser;
-  document.querySelector("#cloud-load").disabled=!currentUser;
+  document.querySelector("#cloud-save").disabled=!configured || !currentUser;
+  document.querySelector("#cloud-load").disabled=!configured || !currentUser;
+  if (!configured) {
+    document.querySelector("#auth-sign-up").title="Add Supabase URL and anon key in supabase-config.js first.";
+    document.querySelector("#auth-sign-in").title="Add Supabase URL and anon key in supabase-config.js first.";
+  }
+}
+
+function explainCloudSetup() {
+  const text="Email signup needs Supabase setup first. Add your Project URL and public anon key in supabase-config.js.";
+  updateCloudStatus(text,false);
+  document.querySelector("#status-headline").textContent=text;
+  message(text,false);
+  playCue("error");
 }
 
 function initCloud() {
@@ -538,19 +561,19 @@ function authFields() {
 }
 
 async function signUp() {
-  if (!supabaseClient) return updateCloudStatus("Add your Supabase URL and anon key first.");
+  if (!supabaseClient) return explainCloudSetup();
   const {email,password}=authFields();
-  if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.");
+  if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.",false);
   const {error}=await supabaseClient.auth.signUp({email,password});
-  if (error) return updateCloudStatus(error.message);
-  updateCloudStatus("Account created. Check your email if confirmation is enabled, then sign in.");
+  if (error) return updateCloudStatus(error.message,false);
+  updateCloudStatus("Account created. Check your email if confirmation is enabled, then sign in.",true);
 }
 
 async function signIn() {
-  if (!supabaseClient) return updateCloudStatus("Add your Supabase URL and anon key first.");
+  if (!supabaseClient) return explainCloudSetup();
   const {email,password}=authFields();
   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if (error) return updateCloudStatus(error.message);
+  if (error) return updateCloudStatus(error.message,false);
   currentUser=data.user; updateCloudStatus();
 }
 
