@@ -56,6 +56,7 @@ The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js
 - Progress from cash trading into limit orders, margin shorts, options, and M&A through account-growth or experience milestones.
 - Use a live LED ticker, portfolio-HQ hero, allocation ring, quick statistics, top movers, and clickable market heatmap.
 - Navigate a blue corporate command center inspired by classic business simulators, with a tool rail, city atmosphere, framed data windows, and persistent bottom news/status console.
+- Place market, limit, stop, and stop-limit orders with portfolio-percentage quick sizing and animated execution confirmations.
 
 ## Foundation
 
