@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Foundry</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">BUSINESS & MARKET SIMULATOR</p>
+      <h1>Market Foundry</h1>
+    </div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save</button><button id="load-game">Load</button><button id="new-game">New game</button><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
+  </header>
+
+  <main>
+    <section class="metrics" aria-label="Portfolio summary">
+      <article><span>Cash</span><strong id="cash"></strong></article>
+      <article><span>Investments</span><strong id="investments"></strong></article>
+      <article><span>Net worth</span><strong id="net-worth"></strong></article>
+      <article><span>Return</span><strong id="return"></strong></article>
+    </section>
+
+    <section class="economy panel">
+      <div class="panel-title"><div><h2>World Economy</h2><span id="economic-regime"></span></div><strong id="economy-outlook"></strong></div>
+      <div id="economy-kpis" class="economy-kpis"></div>
+    </section>
+
+    <section class="objectives panel">
+      <div class="panel-title"><div><h2>Year One Challenge</h2><span>Reach day 240 without personal or corporate bankruptcy</span></div><strong id="campaign-status"></strong></div>
+      <div id="objective-list" class="objective-list"></div>
+    </section>
+
+    <section id="advisor" class="advisor panel">
+      <div><p class="eyebrow">EXECUTIVE ADVISOR</p><h2 id="advisor-title"></h2><p id="advisor-text"></p></div>
+      <div class="advisor-actions"><span id="advisor-progress"></span><button id="advisor-dismiss">Dismiss</button><button id="advisor-next" class="primary">Next tip</button></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="market-panel panel">
+        <div class="panel-title"><h2>Market</h2><span>5 listed firms</span></div>
+        <div id="stock-list" class="stock-list"></div>
+      </aside>
+
+      <section class="company-panel panel">
+        <div class="company-heading">
+          <div><p id="sector" class="eyebrow"></p><h2 id="company-name"></h2><p id="ticker"></p></div>
+          <div class="quote"><strong id="price"></strong><span id="change"></span></div>
+        </div>
+        <canvas id="chart" width="760" height="240" aria-label="Price history chart"></canvas>
+        <div class="fundamentals" id="fundamentals"></div>
+        <div class="order-book">
+          <div><h3>Bids</h3><div id="bids"></div></div>
+          <div><h3>Asks</h3><div id="asks"></div></div>
+        </div>
+      </section>
+
+      <aside class="trade-panel panel">
+        <h2>Place order</h2>
+        <div class="side-toggle"><button class="active" data-side="buy">Buy</button><button data-side="sell">Sell / Short</button></div>
+        <div class="order-type"><button class="active" data-order-type="market">Market</button><button data-order-type="limit">Limit</button></div>
+        <label>Shares<input id="quantity" type="number" min="1" value="10"></label>
+        <label id="limit-price-label" class="hidden">Limit price<input id="limit-price" type="number" min="0.01" step="0.01"></label>
+        <div class="estimate"><span>Estimated value</span><strong id="estimate"></strong></div>
+        <button id="trade" class="primary">Buy shares</button>
+        <p id="trade-message" role="status"></p>
+        <hr>
+        <h3>Your position</h3>
+        <div id="position" class="position"></div>
+      </aside>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel"><div class="panel-title"><h2>Portfolio</h2><span>Mark-to-market</span></div><div id="portfolio"></div></article>
+      <article class="panel"><div class="panel-title"><h2>Market news</h2><span>Latest events</span></div><div id="news" class="news"></div></article>
+    </section>
+
+    <section class="lower-grid activity-grid">
+      <article class="panel"><div class="panel-title"><h2>Open orders</h2><span>Checked each day</span></div><div id="open-orders"></div></article>
+      <article class="panel"><div class="panel-title"><h2>Account ledger</h2><span>Latest activity</span></div><div id="ledger"></div></article>
+    </section>
+
+    <section class="financial-reports panel">
+      <div class="panel-title"><div><h2>Quarterly Financial Reports</h2><span id="report-company"></span></div><strong id="earnings-signal"></strong></div>
+      <div class="reports-grid">
+        <div id="latest-report" class="latest-report"></div>
+        <div><h3>Report history</h3><div id="report-history" class="report-history"></div></div>
+        <div class="management-note"><h3>Investor interpretation</h3><p>Analyst expectations are set before results. Revenue and earnings surprises affect the share price, while cash, debt, margins, and growth reveal the quality of the result.</p><p id="analyst-commentary"></p></div>
+      </div>
+    </section>
+
+    <section class="options panel">
+      <div class="panel-title"><div><h2>Options Market</h2><span id="options-underlying"></span></div><strong id="options-status"></strong></div>
+      <div class="options-grid">
+        <div class="option-ticket">
+          <div class="side-toggle"><button class="active" data-option-type="call">Call</button><button data-option-type="put">Put</button></div>
+          <label>Strike price<select id="option-strike"></select></label>
+          <label>Expiry<select id="option-expiry"><option value="20">20 days</option><option value="60" selected>60 days</option><option value="120">120 days</option></select></label>
+          <label>Contracts<input id="option-contracts" type="number" min="1" value="1"></label>
+          <div class="estimate"><span>Premium per contract</span><strong id="option-premium"></strong></div>
+          <div class="estimate"><span>Maximum loss</span><strong id="option-cost"></strong></div>
+          <button id="buy-option" class="primary">Buy call</button>
+          <p id="option-message"></p>
+        </div>
+        <div><h3>Open option positions</h3><div id="option-positions" class="option-positions"></div></div>
+        <div class="management-note"><h3>Contract basics</h3><p>One contract controls 100 shares. Calls gain value above the strike; puts gain value below it. The premium declines as expiry approaches, and contracts settle automatically in cash.</p><p id="option-explanation"></p></div>
+      </div>
+    </section>
+
+    <section class="operations panel">
+      <div class="panel-title">
+        <div><h2>Run Nova Devices</h2><span id="active-product-name">You are CEO and controlling shareholder</span></div>
+        <strong id="operations-status">Decisions ready</strong>
+      </div>
+      <div class="operations-grid">
+        <div class="decision-controls">
+          <label>Product price <strong id="product-price-value"></strong><input id="product-price" type="range" min="300" max="1600" step="10"></label>
+          <label>Daily production <strong id="production-value"></strong><input id="production" type="range" min="400" max="1800" step="50"></label>
+          <label>Marketing budget <strong id="marketing-value"></strong><input id="marketing" type="range" min="0" max="300" step="10"></label>
+          <label>Research budget <strong id="research-value"></strong><input id="research" type="range" min="0" max="250" step="10"></label>
+          <button id="apply-decisions" class="primary">Apply management decisions</button>
+        </div>
+        <div id="operations-kpis" class="operations-kpis"></div>
+        <div class="management-note">
+          <h3>How it works</h3>
+          <p>Lower prices and stronger marketing increase demand. Production creates inventory and costs cash. Research slowly improves product quality, supporting demand and margins over time.</p>
+          <p id="management-advice"></p>
+        </div>
+      </div>
+      <div class="product-portfolio">
+        <div class="panel-title"><h3>Product Portfolio</h3><span>Choose a product to manage or fund a launch</span></div>
+        <div id="product-list" class="product-list"></div>
+      </div>
+    </section>
+
+    <section class="corporate-finance panel">
+      <div class="panel-title">
+        <div><h2>Corporate Finance</h2><span>Fund Nova Devices and protect control</span></div>
+        <strong id="control-status"></strong>
+      </div>
+      <div class="finance-grid">
+        <div id="finance-kpis" class="finance-kpis"></div>
+        <div class="finance-actions">
+          <button data-finance-action="bond">Issue $10m bond<small>No dilution, market-rate interest</small></button>
+          <button data-finance-action="repay">Repay $5m debt<small>Reduces interest expense</small></button>
+          <button data-finance-action="issue">Issue 50k shares<small>Raises cash, dilutes owners</small></button>
+          <button data-finance-action="buyback">Buy back 25k shares<small>Uses cash, concentrates control</small></button>
+        </div>
+        <div class="management-note">
+          <h3>Board control</h3>
+          <p>Keep more than 50% of voting shares to control daily management. Shares bought in your portfolio count toward your vote; short positions do not.</p>
+          <p id="finance-message"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="takeovers panel">
+      <div class="panel-title">
+        <div><h2>Mergers & Acquisitions</h2><span>Build strategic stakes in rival companies</span></div>
+        <strong id="takeover-status"></strong>
+      </div>
+      <div id="takeover-targets" class="takeover-targets"></div>
+    </section>
+  </main>
+
+  <div id="game-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card"><p class="eyebrow" id="modal-kicker"></p><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-score" class="modal-score"></div><button id="modal-button" class="primary">Start a new game</button></div>
+  </div>
+
+  <footer>Market mechanics inspired by the MIT-licensed Bristol Stock Exchange by Dave Cliff. This is a fictional game, not financial advice.</footer>
+  <script src="game.js"></script>
+</body>
+</html>
