@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
   <header>
     <div>
       <p class="eyebrow">BUSINESS & MARKET SIMULATOR</p>
@@ -16,11 +17,35 @@
   </header>
 
   <main>
+    <section class="dashboard panel">
+      <div class="dashboard-hero">
+        <p class="eyebrow">PORTFOLIO HQ</p>
+        <span>Total portfolio value</span>
+        <strong id="hero-net-worth"></strong>
+        <div id="hero-daily-pnl" class="hero-pnl"></div>
+        <div id="equity-sparkline" class="equity-sparkline"></div>
+      </div>
+      <div class="allocation-wrap">
+        <div id="allocation-ring" class="allocation-ring"><div><strong id="allocation-count"></strong><span>positions</span></div></div>
+        <div><h3>Asset allocation</h3><div id="allocation-legend" class="allocation-legend"></div></div>
+      </div>
+      <div class="dashboard-movers"><h3>Top movers</h3><div id="top-movers"></div></div>
+    </section>
+
     <section class="metrics" aria-label="Portfolio summary">
       <article><span>Cash</span><strong id="cash"></strong></article>
       <article><span>Investments</span><strong id="investments"></strong></article>
       <article><span>Net worth</span><strong id="net-worth"></strong></article>
       <article><span>Return</span><strong id="return"></strong></article>
+      <article><span>Buying power</span><strong id="buying-power"></strong></article>
+      <article><span>Margin used</span><strong id="margin-used"></strong></article>
+      <article><span>Today's trades</span><strong id="trades-today"></strong></article>
+      <article><span>Open orders</span><strong id="orders-count"></strong></article>
+    </section>
+
+    <section class="market-overview panel">
+      <div class="panel-title"><div><h2>Market Heatmap</h2><span>Size reflects market value; color reflects today's move</span></div><strong id="market-breadth"></strong></div>
+      <div id="market-heatmap" class="market-heatmap"></div>
     </section>
 
     <section class="economy panel">
