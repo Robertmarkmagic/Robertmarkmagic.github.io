@@ -9,7 +9,29 @@ Run `node server.js`, then open `http://localhost:4173`. No installation or buil
 ## Public deployment
 
 The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js`,
-`.nojekyll`, `README.md`, and `THIRD_PARTY_NOTICES.md` at the repository root.
+`.nojekyll`, `README.md`, `THIRD_PARTY_NOTICES.md`, `supabase-config.js`, and
+`supabase-schema.sql` at the repository root.
+
+## Email signup and cloud saves
+
+GitHub Pages is static, so cloud accounts and saved games need a hosted database.
+This prototype is wired for Supabase Auth and a Postgres `saved_games` table.
+
+1. Create a free Supabase project.
+2. Open the Supabase SQL editor and run everything in `supabase-schema.sql`.
+3. In Supabase, copy the Project URL and public anon key from Project Settings > API.
+4. Paste them into `supabase-config.js`:
+
+```js
+window.MARKET_FOUNDRY_SUPABASE = {
+  url: "https://your-project.supabase.co",
+  anonKey: "your-public-anon-key"
+};
+```
+
+Use only the public anon key in the website. Never paste the service-role key into
+GitHub Pages. Row-level security in `supabase-schema.sql` limits each player to
+their own saved-game row.
 
 ## Current gameplay
 
@@ -31,6 +53,7 @@ The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js
 - Economic conditions affect company demand, costs, profits, bond coupons, and valuations.
 - Industries have different sensitivities to recessions and inflation shocks.
 - Save and load campaigns locally in the browser.
+- Create an email account and save/load the campaign from the cloud when Supabase is configured.
 - Choose easy, normal, or hard difficulty when starting a new game.
 - Complete a 240-day campaign with wealth, market-share, liquidity, and control objectives.
 - Campaigns end through personal bankruptcy, corporate bankruptcy, or year-end scoring.
@@ -57,6 +80,8 @@ The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js
 - Use a live LED ticker, portfolio-HQ hero, allocation ring, quick statistics, top movers, and clickable market heatmap.
 - Navigate a blue corporate command center inspired by classic business simulators, with a tool rail, city atmosphere, framed data windows, and persistent bottom news/status console.
 - Place market, limit, stop, and stop-limit orders with portfolio-percentage quick sizing and animated execution confirmations.
+- Start from a clear launch screen with generated corporate-city artwork and a guided six-step tutorial.
+- Meet a fictional executive advisor portrait used in the launch screen and tutorial.
 
 ## Foundation
 

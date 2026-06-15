@@ -57,6 +57,8 @@ const SAVE_KEY="market-foundry-save-v5";
 const initialCompanies=JSON.parse(JSON.stringify(companies));
 const initialState=JSON.parse(JSON.stringify(state));
 let orderId = 0;
+let supabaseClient = null;
+let currentUser = null;
 const progressionMilestones = [
   {id:"basic",name:"Cash Trader",description:"Market buy and sell orders",worth:0,day:1},
   {id:"limit",name:"Order Specialist",description:"Limit orders and patient execution",worth:105000,day:10},
@@ -185,6 +187,44 @@ function showExecutionToast(text) {
   toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200);
 }
 
+const tutorialSteps=[
+  {selector:"#dashboard",title:"Portfolio HQ",text:"This is your command center. Watch total value, daily profit/loss, allocation, and the largest market movers."},
+  {selector:"#market",title:"Market Heatmap",text:"Each tile is a listed company. Green rises, red falls. Click a tile to inspect that company in the trading area."},
+  {selector:"#trading",title:"Trading Terminal",text:"Choose a stock, enter shares, then place a market order. Advanced order types unlock as your account grows."},
+  {selector:"#operations",title:"Run Nova Devices",text:"You are not only a trader. Adjust price, production, marketing, and research to improve Nova's business performance."},
+  {selector:".progression",title:"Investor Progression",text:"The game starts simple and unlocks limit orders, shorts, options, and acquisitions as you gain wealth or experience."},
+  {selector:".clock",title:"Advance Time",text:"Use +1 day, +1 week, or +1 month to move the simulation. Prices, earnings, dividends, AI funds, and news all evolve."}
+];
+let tutorialIndex=0;
+function beginTutorial() {
+  tutorialIndex=0;
+  document.querySelector("#tutorial-overlay").classList.remove("hidden");
+  renderTutorial();
+}
+function renderTutorial() {
+  document.querySelectorAll(".tutorial-focus").forEach(el=>el.classList.remove("tutorial-focus"));
+  const step=tutorialSteps[tutorialIndex], target=document.querySelector(step.selector);
+  document.querySelector("#tutorial-kicker").textContent="GUIDED TOUR "+(tutorialIndex+1)+" / "+tutorialSteps.length;
+  document.querySelector("#tutorial-title").textContent=step.title;
+  document.querySelector("#tutorial-text").textContent=step.text;
+  document.querySelector("#tutorial-next").textContent=tutorialIndex===tutorialSteps.length-1?"Finish":"Next";
+  if (target) { target.classList.add("tutorial-focus"); target.scrollIntoView({behavior:"smooth",block:"center"}); }
+}
+function finishTutorial() {
+  document.querySelectorAll(".tutorial-focus").forEach(el=>el.classList.remove("tutorial-focus"));
+  document.querySelector("#tutorial-overlay").classList.add("hidden");
+}
+function nextTutorialStep() {
+  if (tutorialIndex>=tutorialSteps.length-1) return finishTutorial();
+  tutorialIndex++; renderTutorial();
+}
+
+function openLaunchModal() {
+  document.querySelector("#launch-modal").classList.remove("hidden");
+  document.querySelector("#launch-load").disabled=!localStorage.getItem(SAVE_KEY);
+  updateCloudStatus();
+}
+
 const marketLinks = {
   NOVA:[{ticker:"AXIS",weight:.28,label:"distribution demand"},{ticker:"MEDI",weight:.16,label:"innovation spillover"},{ticker:"HARB",weight:-.08,label:"capital rotation"}],
   GRNW:[{ticker:"AXIS",weight:-.22,label:"fuel-cost pressure"},{ticker:"NOVA",weight:.10,label:"lower energy costs"},{ticker:"HARB",weight:.06,label:"input-cost relief"}],
@@ -246,4 +286,974 @@ function advanceDay(renderAfter=true) {
     applyMarketEvent(c,event);
   }
   companies.forEach(c=>{ c.history.push(c.price); if(c.history.length>60)c.history.shift(); seedBook(c); });
-  processOpenOrders(×½´ÚÚ$z{-®éÜj×FW&W7E&FSÂãeÒÀ¢²$æfÆFöâ"Ç7BRææfÆFöâÆRææfÆFöãÂãEÒÀ¢²$tEw&÷wF"Ç7BRæw&÷wFÆRæw&÷wFãÒÀ¢²$6öæfFVæ6R"ÆRæ6öæfFVæ6RçFôfVBÆRæ6öæfFVæ6SãÓÒÀ¢²$gVVÂæFW"ÆRægVVÄæFWçFôfVBÆRægVVÄæFWÃ#Ð¢Ó°¢Fö7VÖVçBçVW'6VÆV7F÷""6V6öæö×Ö·2"æææW$DÔÃ×fÇVW2æÖcÓæÆFcãÇ7ãâG·e³×ÓÂ÷7ããÇ7G&öær6Æ73Ò"G·e³%Óò'W#¢&F÷vâ'Ò#âG·e³×ÓÂ÷7G&öæsãÂöFcææ¦öâ""°¢Fö7VÖVçBçVW'6VÆV7F÷""6Ö&¶WB×&ÆW2"æææW$DÔÃ×7FFRæÖ&¶WE&ÆW2æÆVæwF÷7FFRæÖ&¶WE&ÆW2ç6Æ6RÃ2æÖ&ÆSÓç°¢6öç7BVffV7G3×&ÆRæVffV7G2æÖVffV7CÓæÇ7â6Æ73Ò"G¶VffV7Bæ×7CãÓò'W#¢&F÷vâ'Ò#âG¶VffV7BçF6¶W'ÒG·7BVffV7Bæ×7BÓÂ÷7ãææ¦öâ""°¢6öç7B&FW3×&ÆRç&FU6gCöÇ7â6Æ73Ò"G·&ÆRç&FU6gCãò&F÷vâ#¢'W'Ò#å&FW2G·7B&ÆRç&FU6gBÓÂ÷7ãæ¢"#°¢&WGW&âÆ'F6ÆR6Æ73Ò'&ÆRÖ6&B#ãÆVFW#ãÇ7G&öær6Æ73Ò"G·&ÆRæ×7CãÓò'W#¢&F÷vâ'Ò#âG·&ÆRç6÷W&6WÒG·7B&ÆRæ×7BÓÂ÷7G&öæsãÇFÖSäDG·&ÆRæFÓÂ÷FÖSãÂöVFW#ãÇâG·&ÆRæVFÆæWÓÂ÷ãÆFb6Æ73Ò'&ÆRÖVffV7G2#âG¶VffV7G7ÒG·&FW7ÓÂöFcãÂö'F6ÆSæ°¢Òæ¦öâ""¦Ç7GÆSÒ&6öÆ÷#§f"ÒÖ×WFVB#ä6ö×ç6ö6·2æBFV"6V6öæF'Ö&¶WBVffV7G2vÆÂV"W&RãÂ÷æ°§Ð ¦gVæ7Föâ&VæFW$7FfG°¢Fö7VÖVçBçVW'6VÆV7F÷""6÷VâÖ÷&FW'2"æææW$DÔÃ×7FFRæ÷Vä÷&FW'2æÆVæwF¢ò7FFRæ÷Vä÷&FW'2æÖóÓç¶6öç7BGSÒòçGWÇÂ&ÆÖB"çFõWW$66RÇ&6W3Õ¶òç7F÷ö2G¶ÖöæWæf÷&ÖBòç7F÷Ö¢""ÆòæÆÖCöÂG¶ÖöæWæf÷&ÖBòæÆÖBÖ¢"%ÒæfÇFW"&ööÆVâæ¦öâ"ò"·&WGW&âÆFb6Æ73Ò&7FfG×&÷r#ãÇ7ããÇ7G&öæsâG¶òçF6¶W'ÓÂ÷7G&öæsãÇ6ÖÆÃâG¶òç6FRçFõWW$66RÒG·GWÒG¶òçG&vvW&VBbfòçGSòç7F'G5vF'7F÷"ò"ÒE$ttU$TB#¢"'ÓÂ÷6ÖÆÃãÂ÷7ããÇ7ãâG¶òçVçFGÒ6&W3Â÷7ããÇ7ãâG·&6W7ÓÂ÷7ããÆ'WGFöâFFÖ6æ6VÂÖ÷&FW#Ò"G¶òæGÒ#ä6æ6VÃÂö'WGFöããÂöFcæÒæ¦öâ""¢¢Ç7GÆSÒ'FFæs£G¶6öÆ÷#§f"ÒÖ×WFVB#äæò÷Vâ6öæFFöæÂ÷&FW'2ãÂ÷æ°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖ6æ6VÂÖ÷&FW%Ò"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç°¢7FFRæ÷Vä÷&FW'3×7FFRæ÷Vä÷&FW'2æfÇFW"÷&FW#Óæ÷&FW"æBÓÒ¶'WGFöâæFF6WBæ6æ6VÄ÷&FW"°¢FDÆVFvW"$6æ6VÆVBÆÖB÷&FW""Ã²&VæFW"°¢Ò°¢Fö7VÖVçBçVW'6VÆV7F÷""6ÆVFvW""æææW$DÔÃ×7FFRæÆVFvW"æÆVæwF¢ò7FFRæÆVFvW"æÖFVÓÓæÆFb6Æ73Ò&ÆVFvW"×&÷r#ãÇFÖSäDG¶FVÒæFÓÂ÷FÖSãÇ7ãâG¶FVÒçFWGÓÂ÷7ããÇ7â6Æ73Ò"G¶FVÒæÖ÷VçCãò'W#¦FVÒæÖ÷VçCÃò&F÷vâ#¢"'Ò#âG¶FVÒæÖ÷VçCöÖöæWæf÷&ÖBFVÒæÖ÷VçB¢"'ÓÂ÷7ããÂöFcææ¦öâ""¢¢Ç7GÆSÒ'FFæs£G¶6öÆ÷#§f"ÒÖ×WFVB#åG&FW2ÂFfFVæG2ÂæB÷&FW"7FfGvÆÂV"W&RãÂ÷æ°§Ð ¦gVæ7Föâ&VæFW$÷W&Föç2°¢6öç7B3Ö6ö×æW5³ÒÂ6VÆV7FVCÖ2ç&öGV7G5·7FFRç6VÆV7FVE&öGV7EÓòæ7FfSö2ç&öGV7G5·7FFRç6VÆV7FVE&öGV7EÓ¦2ç&öGV7G2æfæBÓçæ7FfRÂ6VÆV7FVDæFWÖ2ç&öGV7G2ææFWöb6VÆV7FVB°¢7FFRç6VÆV7FVE&öGV7C×6VÆV7FVDæFW°¢6öç7BVæFæsÖ2çVæFætFV66öç3òç&öGV7DæFWÓÓ×6VÆV7FVDæFWö2çVæFætFV66öç3¦çVÆÃ°¢6öç7B&öGV7C×VæFæsòç&öGV7GÇÇ6VÆV7FVC°¢6öç7B6öçG&öÇ3×²'&öGV7B×&6R#§&öGV7Bç&6RÂ'&öGV7Föâ#§&öGV7Bç&öGV7FöâÂ&Ö&¶WFær#§&öGV7BæÖ&¶WFærÂ'&W6V&6#§VæFæsòç&W6V&6óö2ç&W6V&6Ó°¢ö&¦V7BæVçG&W26öçG&öÇ2æf÷$V6¶BÇfÇVUÒÓç¶6öç7BçWCÖFö7VÖVçBçVW'6VÆV7F÷"2G¶GÖ¶bFö7VÖVçBæ7FfTVÆVÖVçBÓÖçWBçWBçfÇVS×fÇVS·Ò°¢Fö7VÖVçBçVW'6VÆV7F÷""67FfR×&öGV7BÖæÖR"çFWD6öçFVçCÖÖæværG·6VÆV7FVBææÖWÒÒG·6VÆV7FVBç6VvÖVçGÒ6VvÖVçF°¢&Vg&W6FV66öäÆ&VÇ2fÇ6R°¢6öç7B7FfU&öGV7FöãÖ2ç&öGV7G2æfÇFW"Óçæ7FfRç&VGV6R7VÒÇÓç7VÒ·ç&öGV7FöâÃ°¢6öç7BfÇVW3Õ°¢²$6ö×ç66"ÆBG¶2æ6ö×ç66çFôfVB"ÖÖÆ2æ6ö×ç66ãÓUÒÀ¢²%VæG26öÆB"Æ2æFÇ6ÆW2çFôÆö6ÆU7G&ærÆ2æFÇ6ÆW3ãÖ7FfU&öGV7Föâ¢ãÒÀ¢²$çfVçF÷'"Æ2æçfVçF÷'çFôÆö6ÆU7G&ærÆ2æçfVçF÷'ÃSÒÀ¢²$FÇ&öfB"ÆG¶2æFÇ÷W&Fæu&öfCãÓò"²#¢"'ÒBG¶2æFÇ÷W&Fæu&öfBçFôfVB"ÖÖÆ2æFÇ÷W&Fæu&öfCãÓÒÀ¢²%÷'FföÆòVÆG"ÆG´ÖFç&÷VæB2çVÆG£ÒòsVÆ2çVÆGãÓÒÀ¢²$Ö&¶WB6&R"Ç7B2æÖ&¶WE6&RÆ2æÖ&¶WE6&SãÒãUÐ¢Ó°¢Fö7VÖVçBçVW'6VÆV7F÷""6÷W&Föç2Ö·2"æææW$DÔÃ×fÇVW2æÖcÓæÆFcãÇ7ãâG·e³×ÓÂ÷7ããÇ7G&öær6Æ73Ò"G·e³%Óò'W#¢&F÷vâ'Ò#âG·e³×ÓÂ÷7G&öæsãÂöFcææ¦öâ""°¢ÆWBGf6SÒ$÷W&Föç2&R&Ææ6VBâ#°¢b2æçfVçF÷'ãSGf6SÒ$çfVçF÷'2ÆærWâ&VGV6R&öGV7Föâ÷"Æ÷vW"FR&öGV7B&6Râ#°¢VÇ6Rb2æFÇ6ÆW3ãbb2æçfVçF÷'Ã3Gf6SÒ$FVÖæB2÷WG'Vææær7WÇâæ7&V6R&öGV7Föâ÷"FW7BvW"&6Râ#°¢VÇ6Rb2æFÇ÷W&Fæu&öfCÃGf6SÒ%FR6ö×ç2Æ÷6ærÖöæWâ&WfWr&öGV7FöâæBF67&WFöæ''VFvWG2â#°¢VÇ6Rb2æ6ö×ç66ÃRGf6SÒ$662FvBâ&÷FV7BÆVFG&Vf÷&RgVæFærvw&W76fRw&÷wFâ#°¢Fö7VÖVçBçVW'6VÆV7F÷""6ÖævVÖVçBÖGf6R"çFWD6öçFVçCÖGf6S°¢Fö7VÖVçBçVW'6VÆV7F÷""6ÇÖFV66öç2"æF6&ÆVCÒ46öçG&öÂ°¢&VæFW%&öGV7G2°§Ð ¦gVæ7Föâ&VæFW%&öGV7G2°¢6öç7B3Ö6ö×æW5³Ó°¢Fö7VÖVçBçVW'6VÆV7F÷""7&öGV7BÖÆ7B"æææW$DÔÃÖ2ç&öGV7G2æÖ&öGV7BÆæFWÓç°¢b&öGV7Bæ7FfR&WGW&âÆ'F6ÆR6Æ73Ò'&öGV7BÖ6&B#ãÆVFW#ãÆFcãÆ3âG·&öGV7BææÖWÓÂö3ãÇ7ãâG·&öGV7Bç6VvÖVçGÒ6VvÖVçCÂ÷7ããÂöFcãÇ7G&öæsäÄô4´TCÂ÷7G&öæsãÂöVFW#ãÇäÆVæ66÷7C¢BG·&öGV7BæÆVæ66÷7GÖÒâæFÂVæB6÷7C¢G¶ÖöæWæf÷&ÖB&öGV7BçVæD6÷7BÒãÂ÷ãÆ'WGFöâFFÖÆVæ6×&öGV7CÒ"G¶æFWÒ"G²46öçG&öÂò&F6&ÆVB#¢"'ÓäÆVæ6G·&öGV7BææÖWÓÂö'WGFöããÂö'F6ÆSæ°¢6öç7B&6Tv×&öGV7Bç&6R÷&öGV7Bæ6ö×WFF÷%&6RÓ°¢&WGW&âÆ'F6ÆR6Æ73Ò'&öGV7BÖ6&BG¶æFWÓÓ×7FFRç6VÆV7FVE&öGV7Cò'6VÆV7FVB#¢"'Ò#ãÆVFW#ãÆFcãÆ3âG·&öGV7BææÖWÓÂö3ãÇ7ãâG·&öGV7Bç6VvÖVçGÒ6VvÖVçCÂ÷7ããÂöFcãÇ7G&öær6Æ73Ò"G·&6TvÃÓò'W#¢&F÷vâ'Ò#âG·&6TvÃÓò%dÅTR#¢%$TÔTÒ'ÓÂ÷7G&öæsãÂöVFW#ãÆFb6Æ73Ò'&öGV7B×7FG2#ãÇ7ãäæ÷f&6SÇ7G&öæsâG¶ÖöæWæf÷&ÖB&öGV7Bç&6RÓÂ÷7G&öæsãÂ÷7ããÇ7ãä6ö×WFF÷#Ç7G&öæsâG¶ÖöæWæf÷&ÖB&öGV7Bæ6ö×WFF÷%&6RÓÂ÷7G&öæsãÂ÷7ããÇ7ãäFÇ6ÆW3Ç7G&öæsâG·&öGV7BæFÇ6ÆW2çFôÆö6ÆU7G&ærÓÂ÷7G&öæsãÂ÷7ããÇ7ãäçfVçF÷'Ç7G&öæsâG·&öGV7BæçfVçF÷'çFôÆö6ÆU7G&ærÓÂ÷7G&öæsãÂ÷7ããÇ7ãåVÆGÇ7G&öæsâG´ÖFç&÷VæB&öGV7BçVÆG£ÒòsSÂ÷7G&öæsãÂ÷7ããÇ7ãåVæB6÷7CÇ7G&öæsâG¶ÖöæWæf÷&ÖB&öGV7BçVæD6÷7BÓÂ÷7G&öæsãÂ÷7ããÂöFcãÆ'WGFöâFF×6VÆV7B×&öGV7CÒ"G¶æFWÒ#âG¶æFWÓÓ×7FFRç6VÆV7FVE&öGV7Cò$7W'&VçFÇÖævær#¢$ÖævR&öGV7B'ÓÂö'WGFöããÂö'F6ÆSæ°¢Òæ¦öâ""°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FF×6VÆV7B×&öGV7EÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç·7FFRç6VÆV7FVE&öGV7CÒ¶'WGFöâæFF6WBç6VÆV7E&öGV7C·&VæFW"·Ò°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖÆVæ6×&öGV7EÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓæÆVæ6&öGV7B¶'WGFöâæFF6WBæÆVæ6&öGV7B°§Ð ¦gVæ7Föâ&VæFW$fææ6R°¢6öç7B3Ö6ö×æW5³ÒÂ÷væW'6×f÷Fæt÷væW'6Â6öçG&öÆÆVCÖ46öçG&öÂ°¢6öç7BV&Æ56&W3Ö2çF÷FÅ6&W2Ö2æf÷VæFW%6&W3°¢Fö7VÖVçBçVW'6VÆV7F÷""66öçG&öÂ×7FGW2"çFWD6öçFVçCÖ6öçG&öÆÆVCò$&ö&B6öçG&öÆÆVB#¢$6öçG&öÂÆ÷7B#°¢Fö7VÖVçBçVW'6VÆV7F÷""66öçG&öÂ×7FGW2"æ6Æ74æÖSÖ6öçG&öÆÆVCò'W#¢&F÷vâ#°¢6öç7BfÇVW3Õ°¢²%f÷Fær÷væW'6"Ç7B÷væW'6Æ6öçG&öÆÆVEÒÀ¢²$f÷VæFW"6&W2"Æ2æf÷VæFW%6&W2çFôÆö6ÆU7G&ærÇG'VUÒÀ¢²%÷'FföÆòf÷FW2"ÄÖFæÖÇ7FFRæöÆFæw5¶2çF6¶W%×ÇÃçFôÆö6ÆU7G&ærÇG'VUÒÀ¢²%6&W2÷WG7FæFær"Æ2çF÷FÅ6&W2çFôÆö6ÆU7G&ærÆ2çF÷FÅ6&W3ÃÓÒÀ¢²%V&Æ26&W2"ÇV&Æ56&W2çFôÆö6ÆU7G&ærÇG'VUÒÀ¢²$&öæBFV'B"ÆBG¶2æ&öæDFV'BçFôfVBÖÖÆ2æ&öæDFV'CÃ#ÒÀ¢²$fW&vR6÷Wöâ"Ç7B2æ&öæE&FRÆ2æ&öæE&FSÂãuÒÀ¢²$FÇçFW&W7B"ÆBG¶2æFÇçFW&W7BçFôfVB2ÖÖÆ2æFÇçFW&W7CÂãUÒÀ¢²$6ö×ç66"ÆBG¶2æ6ö×ç66çFôfVB"ÖÖÆ2æ6ö×ç66ãÓUÐ¢Å²%7G&FVv276WG2"ÆBG¶7V6Föä76WEfÇVRçFôfVB"ÖÖÆ7V6Föä76WEfÇVRãÐ¢Ó°¢Fö7VÖVçBçVW'6VÆV7F÷""6fææ6RÖ·2"æææW$DÔÃ×fÇVW2æÖcÓæÆFcãÇ7ãâG·e³×ÓÂ÷7ããÇ7G&öær6Æ73Ò"G·e³%Óò'W#¢&F÷vâ'Ò#âG·e³×ÓÂ÷7G&öæsãÂöFcææ¦öâ""°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖfææ6RÖ7FöåÒ"æf÷$V6'WGFöãÓæ'WGFöâæF6&ÆVCÒ6öçG&öÆÆVB°¢b6öçG&öÆÆVBbbFö7VÖVçBçVW'6VÆV7F÷""6fææ6RÖÖW76vR"çFWD6öçFVçBfææ6TÖW76vR$'WFFFöæÂæ÷f6&W2âFRÖ&¶WBFò&V'VÆBÖ¦÷&Gf÷Fær7F¶Râ"ÆfÇ6R°§Ð ¦gVæ7Föâ&VæFW%F¶V÷fW'2°¢6öç7B7æW&vW3×°¢u$ås¢$VæW&wçFVw&FöâÆ÷vW'2Æöær×'Vâ÷W&Fær&6²â"À¢$#¢%&WFÂF7G&'WFöâ7G&VæwFVç26öç7VÖW"&V6â"À¢3¢$÷væVBÆöv7F72×&÷fW27WÇÖ6âVff6Væ7â"À¢ÔTD¢%&W6V&6WW'F6R66VÆW&FW2&öGV7BVÆGvç2â ¢Ó°¢Fö7VÖVçBçVW'6VÆV7F÷""7F¶V÷fW"×7FGW2"çFWD6öçFVçCÖfVGW&UVæÆö6¶VB&Ö"ò7FFRçF¶V÷fW$æ÷F6WÇÂ$æò7FfRF¶V÷fW"6×vâ"¢$Äô4´TBÒ&V6CCV²÷"F#°¢Fö7VÖVçBçVW'6VÆV7F÷""7F¶V÷fW"×F&vWG2"æææW$DÔÃÖ6ö×æW2ç6Æ6RæÖF&vWCÓç°¢6öç7B6÷7C×F¶V÷fW$&Æö6´6÷7BF&vWBÂ6VÆÅfÇVS×F&vWBç&6R§F&vWBçF÷FÅ6&W2ó¢ã¢ãS°¢&WGW&âÆ'F6ÆR6Æ73Ò'F¶V÷fW"Ö6&B#à¢ÆVFW#ãÆFcãÆ3âG·F&vWBææÖWÓÂö3ãÇ7ãâG·F&vWBçF6¶W'ÒfÖFF÷C²G·F&vWBç6V7F÷'ÓÂ÷7ããÂöFcãÇ7G&öær6Æ73Ò"G·F&vWBæ6öçG&öÆÆVCò'W#¢"'Ò#âG·F&vWBæ6öçG&öÆÆVCò%5T%4D%#¢$äDUTäDTåB'ÓÂ÷7G&öæsãÂöVFW#à¢ÆFb6Æ73Ò'7F¶RÖ&"#ãÆ7GÆSÒ'vGF¢G·F&vWBææ÷f7F¶R£#ÒR#ãÂöãÂöFcà¢ÆFb6Æ73Ò'F¶V÷fW"ÖÖWF#ãÇ7ãäæ÷f7F¶SÇ7G&öæsâG·7BF&vWBææ÷f7F¶RÓÂ÷7G&öæsãÂ÷7ããÇ7ãäFVfVç6R&VÖVÓÇ7G&öæsâG·7BF&vWBçF¶V÷fW$FVfVç6RÓÂ÷7G&öæsãÂ÷7ããÇ7ãäæWBSÇ7G&öæsâG¶ÖöæWæf÷&ÖB6÷7B£ÓÂ÷7G&öæsãÂ÷7ããÂöFcà¢ÆFb6Æ73Ò'F¶V÷fW"Ö7Föç2#ãÆ'WGFöâFFÖ'W×F&vWCÒ"G·F&vWBçF6¶W'Ò"G·F&vWBæ6öçG&öÆÆVGÇÂ46öçG&öÂÇÂfVGW&UVæÆö6¶VB&Ö"ò&F6&ÆVB#¢"'Óä'WSÂö'WGFöããÆ'WGFöâFF×6VÆÂ×F&vWCÒ"G·F&vWBçF6¶W'Ò"G·F&vWBææ÷f7F¶SÂãò&F6&ÆVB#¢"'Óå6VÆÂRG¶ÖöæWæf÷&ÖB6VÆÅfÇVR£ÒÂö'WGFöããÂöFcà¢ÇâG·7æW&vW5·F&vWBçF6¶W%×ÓÂ÷à¢Âö'F6ÆSæ°¢Òæ¦öâ""°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖ'W×F&vWEÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓæ'WF¶V÷fW$&Æö6²'WGFöâæFF6WBæ'WF&vWB°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FF×6VÆÂ×F&vWEÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç6VÆÅF¶V÷fW$&Æö6²'WGFöâæFF6WBç6VÆÅF&vWB°§Ð ¦gVæ7Föâ&Vg&W6FV66öäÆ&VÇ2Ö&´F'G×G'VR°¢Fö7VÖVçBçVW'6VÆV7F÷""7&öGV7B×&6R×fÇVR"çFWD6öçFVçCÖÖöæWæf÷&ÖB¶Fö7VÖVçBçVW'6VÆV7F÷""7&öGV7B×&6R"çfÇVR°¢Fö7VÖVçBçVW'6VÆV7F÷""7&öGV7Föâ×fÇVR"çFWD6öçFVçCÖG²¶Fö7VÖVçBçVW'6VÆV7F÷""7&öGV7Föâ"çfÇVRçFôÆö6ÆU7G&ærÒVæG6°¢Fö7VÖVçBçVW'6VÆV7F÷""6Ö&¶WFær×fÇVR"çFWD6öçFVçCÖBG¶Fö7VÖVçBçVW'6VÆV7F÷""6Ö&¶WFær"çfÇVWÖ²öF°¢Fö7VÖVçBçVW'6VÆV7F÷""7&W6V&6×fÇVR"çFWD6öçFVçCÖBG¶Fö7VÖVçBçVW'6VÆV7F÷""7&W6V&6"çfÇVWÖ²öF°¢bÖ&´F'GFö7VÖVçBçVW'6VÆV7F÷""6÷W&Föç2×7FGW2"çFWD6öçFVçCÒ%Vç6fVB6ævW2#°§Ð ¦gVæ7FöâWFFTW7FÖFR°¢6öç7B3Ö6ö×æW5·7FFRç6VÆV7FVEÒÇGÔÖFæÖÂ¶Fö7VÖVçBçVW'6VÆV7F÷""7VçFG"çfÇVWÇÃ°¢Fö7VÖVçBçVW'6VÆV7F÷""7FW&ÖæÂ×7Ö&öÂ"çFWD6öçFVçCÖG¶2çF6¶W'ÒG¶ÖöæWæf÷&ÖB2ç&6RÖ°¢b7FFRæ÷&FW%GRÓÒ&Ö&¶WB"°¢6öç7BÆÖCÒ¶Fö7VÖVçBçVW'6VÆV7F÷""6ÆÖB×&6R"çfÇVWÇÆ2ç&6S°¢6öç7B&VfW&Væ6S×7FFRæ÷&FW%GSÓÓÒ'7F÷#ò¶Fö7VÖVçBçVW'6VÆV7F÷""77F÷×&6R"çfÇVWÇÆ2ç&6S¦ÆÖC°¢Fö7VÖVçBçVW'6VÆV7F÷""6W7FÖFR"çFWD6öçFVçCÖÖöæWæf÷&ÖBG§&VfW&Væ6R°¢Fö7VÖVçBçVW'6VÆV7F÷""7G&FR"çFWD6öçFVçCÖÆ6RG·7FFRç6FWÒG·7FFRæ÷&FW%GWÒ÷&FW&°¢&WGW&ã°¢Ð¢6öç7B&öö³×7FFRç6FSÓÓÒ&'W#ö2æ&öö²æ6·3¦2æ&öö²æ&G3¶ÆWBÆVgC×GÇF÷FÃÓ°¢f÷"6öç7Bòöb&öö²¶6öç7BãÔÖFæÖâÆVgBÆòçVçFG·F÷FÂ³Öâ¦òç&6S¶ÆVgBÓÖã¶bÆVgB'&V³·Ð¢Fö7VÖVçBçVW'6VÆV7F÷""6W7FÖFR"çFWD6öçFVçCÖÆVgCò$ç7Vff6VçBÆVFG#¦ÖöæWæf÷&ÖBF÷FÂ°¢Fö7VÖVçBçVW'6VÆV7F÷""7G&FR"çFWD6öçFVçCÖG·7FFRç6FSÓÓÒ&'W#ò$'W#¢%6VÆÂ'ÒG·GÇÂ"'Ò6&W6°§Ð ¦6ö×æW2æf÷$V66VVD&öö²°¦Fö7VÖVçBçVW'6VÆV7F÷""6æWBÖF"æöæ6Æ6³ÒÓç'VäF2²Fö7VÖVçBçVW'6VÆV7F÷""6æWB×vVV²"æöæ6Æ6³ÒÓç'VäF2R²Fö7VÖVçBçVW'6VÆV7F÷""6æWBÖÖöçF"æöæ6Æ6³ÒÓç'VäF2#°¦Fö7VÖVçBçVW'6VÆV7F÷""76÷rÖGf6÷""æöæ6Æ6³ÒÓç·7FFRæGf6÷$FFVãÖfÇ6S·&VæFW"·Ó²Fö7VÖVçBçVW'6VÆV7F÷""6Gf6÷"ÖF6Ö72"æöæ6Æ6³ÒÓç·7FFRæGf6÷$FFVã×G'VS·&VæFW"·Ó²Fö7VÖVçBçVW'6VÆV7F÷""6Gf6÷"ÖæWB"æöæ6Æ6³ÖæWDGf6÷%F°¦Fö7VÖVçBçVW'6VÆV7F÷""7G&FR"æöæ6Æ6³ÖWV7WFUG&FS²Fö7VÖVçBçVW'6VÆV7F÷""7VçFG"æöæçWC×WFFTW7FÖFS²Fö7VÖVçBçVW'6VÆV7F÷""6ÆÖB×&6R"æöæçWC×WFFTW7FÖFS²Fö7VÖVçBçVW'6VÆV7F÷""77F÷×&6R"æöæçWC×WFFTW7FÖFS°¦Fö7VÖVçBçVW'6VÆV7F÷""6'WÖ÷Föâ"æöæ6Æ6³Ö'W÷Föã²Fö7VÖVçBçVW'6VÆV7F÷""6÷Föâ×7G&¶R"æöæ6ævS×&VæFW#²Fö7VÖVçBçVW'6VÆV7F÷""6÷FöâÖW'"æöæ6ævS×&VæFW#²Fö7VÖVçBçVW'6VÆV7F÷""6÷FöâÖ6öçG&7G2"æöæçWC×&VæFW#°¦Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖ÷Föâ×GUÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç·7FFRæ÷FöåGSÖ'WGFöâæFF6WBæ÷FöåGS¶Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖ÷Föâ×GUÒ"æf÷$V6#Óæ"æ6Æ74Æ7BçFövvÆR&7FfR"Æ#ÓÓÖ'WGFöâ·&VæFW"·Ò°¦Fö7VÖVçBçVW'6VÆV7F÷""76fRÖvÖR"æöæ6Æ6³×6fTvÖS²Fö7VÖVçBçVW'6VÆV7F÷""6ÆöBÖvÖR"æöæ6Æ6³ÖÆöDvÖS²Fö7VÖVçBçVW'6VÆV7F÷""6æWrÖvÖR"æöæ6Æ6³ÖæWtvÖS²Fö7VÖVçBçVW'6VÆV7F÷""6ÖöFÂÖ'WGFöâ"æöæ6Æ6³ÖæWtvÖS°¦Fö7VÖVçBçVW'6VÆV7F÷""6Fff7VÇG"æöæ6ævSÒÓç¶b7FFRæFãÖW76vR$Fff7VÇGÆW2vVâ÷R7F'BæWrvÖRâ"ÆfÇ6R·Ó°¦Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FF×6FUÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç·7FFRç6FSÖ'WGFöâæFF6WBç6FS¶Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FF×6FUÒ"æf÷$V6#Óæ"æ6Æ74Æ7BçFövvÆR&7FfR"Æ#ÓÓÖ'WGFöâ¶'WGFöâç&VçDVÆVÖVçBæ6Æ74Æ7BçFövvÆR'6VÆÂ"Ç7FFRç6FSÓÓÒ'6VÆÂ"·WFFTW7FÖFR·Ò°¦Fö7VÖVçBçVW'6VÆV7F÷""6÷&FW"×GR×6VÆV7B"æöæ6ævSÖWfVçCÓç°¢7FFRæ÷&FW%GSÖWfVçBçF&vWBçfÇVS°¢6öç7BW6W4ÆÖC×7FFRæ÷&FW%GSÓÓÒ&ÆÖB'ÇÇ7FFRæ÷&FW%GSÓÓÒ'7F÷ÖÆÖB"ÇW6W57F÷×7FFRæ÷&FW%GSÓÓÒ'7F÷'ÇÇ7FFRæ÷&FW%GSÓÓÒ'7F÷ÖÆÖB"Æ6ö×çÖ6ö×æW5·7FFRç6VÆV7FVEÓ°¢Fö7VÖVçBçVW'6VÆV7F÷""6ÆÖB×&6RÖÆ&VÂ"æ6Æ74Æ7BçFövvÆR&FFVâ"ÂW6W4ÆÖB°¢Fö7VÖVçBçVW'6VÆV7F÷""77F÷×&6RÖÆ&VÂ"æ6Æ74Æ7BçFövvÆR&FFVâ"ÂW6W57F÷°¢bW6W4ÆÖBFö7VÖVçBçVW'6VÆV7F÷""6ÆÖB×&6R"çfÇVSÖ6ö×çç&6RçFôfVB"°¢bW6W57F÷Fö7VÖVçBçVW'6VÆV7F÷""77F÷×&6R"çfÇVSÒ6ö×çç&6R¢7FFRç6FSÓÓÒ&'W#óã3¢ãrçFôfVB"°¢WFFTW7FÖFR°§Ó°¦Fö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FF×V6²×6¦UÒ"æf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓç°¢6öç7B6ö×çÖ6ö×æW5·7FFRç6VÆV7FVEÒÆg&7FöãÒ¶'WGFöâæFF6WBçV6µ6¦RÆVÆCÔÖFæÖÇ7FFRæöÆFæw5¶6ö×ççF6¶W%×ÇÃ°¢6öç7BÖ×VÓ×7FFRç6FSÓÓÒ&'W#ôÖFæfÆö÷"7FFRæ66ö6ö×çç&6R¢VÆGÇÄÖFæfÆö÷"66÷VçDWVG£ã#Rö6ö×çç&6R°¢Fö7VÖVçBçVW'6VÆV7F÷""7VçFG"çfÇVSÔÖFæÖÄÖFæfÆö÷"Ö×VÒ¦g&7Föâ·WFFTW7FÖFR°§Ò°¦Fö7VÖVçBçVW'6VÆV7F÷""6ÇÖFV66öç2"æöæ6Æ6³ÖÇÖævVÖVçDFV66öç3°¥²ââæFö7VÖVçBçVW'6VÆV7F÷$ÆÂ%¶FFÖfææ6RÖ7FöåÒ"Òæf÷$V6'WGFöãÓæ'WGFöâæöæ6Æ6³ÒÓæ6÷'÷&FTfææ6T7Föâ'WGFöâæFF6WBæfææ6T7Föâ°¥²'&öGV7B×&6R"Â'&öGV7Föâ"Â&Ö&¶WFær"Â'&W6V&6%Òæf÷$V6CÓæFö7VÖVçBçVW'6VÆV7F÷"2G¶GÖæöæçWCÒÓç&Vg&W6FV66öäÆ&VÇ2°§væF÷ræFDWfVçDÆ7FVæW"'&W6¦R"ÂÓç&VæFW$6'B6ö×æW5·7FFRç6VÆV7FVEÒ²&VæFW"°
+  processOpenOrders();
+  settleExpiredOptions();
+  if (state.day%60===0) payDividends();
+  checkCampaignState();
+  checkProgression();
+  state.equityHistory.push(accountEquity());
+  state.equityHistory=state.equityHistory.slice(-60);
+  if (renderAfter) render();
+  return !state.gameOver;
+}
+
+function optionUnitPrice(company,type,strike,days) {
+  const intrinsic=type==="call"?Math.max(0,company.price-strike):Math.max(0,strike-company.price);
+  const timeFraction=Math.sqrt(Math.max(0,days)/240);
+  const timeValue=company.price*company.volatility*3.2*timeFraction;
+  const rateValue=type==="call"?company.price*state.economy.interestRate*days/240*.15:0;
+  return Math.max(.05,intrinsic+timeValue+rateValue);
+}
+
+function buyOption() {
+  if (!featureUnlocked("options")) return optionMessage("Options unlock at $125,000 net worth or day 50.",false);
+  const company=companies[state.selected],type=state.optionType,strike=+document.querySelector("#option-strike").value,days=+document.querySelector("#option-expiry").value,contracts=Math.max(1,Math.floor(+document.querySelector("#option-contracts").value||1));
+  const unitPremium=optionUnitPrice(company,type,strike,days),cost=unitPremium*100*contracts;
+  if (cost>state.cash) return optionMessage("Not enough account cash for this premium.",false);
+  state.cash-=cost;
+  state.optionPositions.push({id:orderId++,ticker:company.ticker,type,strike,expiryDay:state.day+days,contracts,entryPremium:unitPremium});
+  addLedger(`Bought ${contracts} ${company.ticker} ${type} option${contracts>1?"s":""}`, -cost);
+  optionMessage(`Purchased for ${money.format(cost)}. Maximum loss is the premium.`,true); render();
+}
+
+function optionPositionValue(position) {
+  const company=companies.find(c=>c.ticker===position.ticker),days=Math.max(0,position.expiryDay-state.day);
+  return optionUnitPrice(company,position.type,position.strike,days)*100*position.contracts;
+}
+
+function sellOptionPosition(id) {
+  const index=state.optionPositions.findIndex(p=>p.id===id);
+  if (index<0) return;
+  const position=state.optionPositions[index],value=optionPositionValue(position);
+  state.cash+=value; state.optionPositions.splice(index,1);
+  addLedger(`Closed ${position.ticker} ${position.type} options`,value); render();
+}
+
+function settleExpiredOptions() {
+  const active=[];
+  for (const position of state.optionPositions) {
+    if (position.expiryDay>state.day) { active.push(position); continue; }
+    const company=companies.find(c=>c.ticker===position.ticker);
+    const intrinsic=position.type==="call"?Math.max(0,company.price-position.strike):Math.max(0,position.strike-company.price);
+    const settlement=intrinsic*100*position.contracts;
+    state.cash+=settlement;
+    addLedger(`${position.ticker} ${position.type} expired${settlement?" in the money":" worthless"}`,settlement);
+  }
+  state.optionPositions=active;
+}
+
+function optionMessage(text,good) { const el=document.querySelector("#option-message");el.textContent=text;el.className=good?"up":"down"; }
+
+function accrueQuarter(company) {
+  const revenue=company.ticker==="NOVA"?company.dailyRevenue:company.revenue/240*(.96+Math.random()*.08);
+  const profit=company.ticker==="NOVA"?company.dailyOperatingProfit:company.profit/240*(.92+Math.random()*.16);
+  company.quarterlyRevenue+=revenue;
+  company.quarterlyProfit+=profit;
+}
+
+function releaseQuarterlyReports() {
+  const quarter=Math.ceil(state.day/60);
+  companies.forEach(company=>{
+    const revenue=company.quarterlyRevenue,profit=company.quarterlyProfit;
+    const revenueSurprise=(revenue-company.analystRevenue)/Math.max(1,Math.abs(company.analystRevenue));
+    const profitSurprise=(profit-company.analystProfit)/Math.max(1,Math.abs(company.analystProfit));
+    const combined=Math.max(-.25,Math.min(.25,revenueSurprise*.35+profitSurprise*.65));
+    const cash=company.ticker==="NOVA"?company.companyCash:Math.max(5,company.profit*.35-company.debt*.03);
+    const report={quarter,revenue,profit,revenueEstimate:company.analystRevenue,profitEstimate:company.analystProfit,revenueSurprise,profitSurprise,margin:revenue?profit/revenue:0,cash,debt:company.debt,combined};
+    company.reports.unshift(report); company.reports=company.reports.slice(0,8);
+    company.price=Math.max(2,company.price*(1+combined*.45));
+    company.analystRevenue=Math.max(1,revenue*(1+company.growth/4)*(.98+Math.random()*.04));
+    company.analystProfit=Math.max(.1,profit*(1+company.growth/4)*(.94+Math.random()*.12));
+    company.quarterlyRevenue=0; company.quarterlyProfit=0;
+    const result=combined>.025?"beat expectations":combined<-.025?"missed expectations":"reported in line";
+    state.news.unshift({day:state.day,text:`${company.name} ${result} for Q${quarter}.`,impact:combined,ticker:company.ticker});
+  });
+  state.news=state.news.slice(0,6);
+}
+
+function runDays(days) {
+  for (let i=0;i<days;i++) {
+    if (!advanceDay(false)) break;
+  }
+  render();
+}
+
+function updateTakeoverMarket() {
+  companies.slice(1).forEach(target=>{
+    if (target.controlled) return;
+    if (target.novaStake>=.2 && Math.random()<.025) {
+      target.takeoverDefense=Math.min(.35,target.takeoverDefense+.05);
+      state.news.unshift({day:state.day,text:`${target.name} adopted takeover defenses against Nova.`,impact:.04,ticker:target.ticker});
+      state.news=state.news.slice(0,6);
+    }
+    target.takeoverDefense=Math.max(0,target.takeoverDefense-.0002);
+  });
+}
+
+function difficultySettings() {
+  return {
+    easy:{targetWorth:105000,targetShare:.17,costMultiplier:.92,volatility:.85,label:"Easy"},
+    normal:{targetWorth:115000,targetShare:.20,costMultiplier:1,volatility:1,label:"Normal"},
+    hard:{targetWorth:130000,targetShare:.24,costMultiplier:1.1,volatility:1.2,label:"Hard"}
+  }[state.difficulty];
+}
+
+function campaignScore() {
+  const c=companies[0], settings=difficultySettings();
+  const wealth=Math.max(0,Math.min(35,accountEquity()/settings.targetWorth*35));
+  const companyHealth=Math.max(0,Math.min(20,(c.companyCash+acquisitionAssetValue())/30*12+Math.max(0,c.dailyOperatingProfit)*8));
+  const share=Math.max(0,Math.min(20,c.marketShare/settings.targetShare*20));
+  const control=hasControl()?15:0;
+  const acquisitions=Math.min(10,controlledSubsidiaries().length*5+companies.slice(1).reduce((sum,target)=>sum+target.novaStake,0)*5);
+  return Math.round(wealth+companyHealth+share+control+acquisitions);
+}
+
+function checkCampaignState() {
+  const c=companies[0];
+  if (accountEquity()<=0) return endGame("Personal bankruptcy","Your trading account has no remaining equity.",false);
+  if (c.companyCash<=0 && c.dailyOperatingProfit<0 && c.bondDebt>=40) return endGame("Corporate bankruptcy","Nova ran out of cash while carrying unsustainable debt.",false);
+  if (state.day>=240) {
+    const s=difficultySettings();
+    const won=accountEquity()>=s.targetWorth&&c.marketShare>=s.targetShare&&c.companyCash>0;
+    endGame(won?"Year One complete":"The board expected more",won?"You built wealth while keeping Nova competitive.":"Nova survived, but one or more campaign objectives were missed.",won);
+  }
+}
+
+function endGame(title,body,won) {
+  state.gameOver=true;
+  document.querySelector("#modal-kicker").textContent=won?"CAMPAIGN COMPLETE":"CAMPAIGN ENDED";
+  document.querySelector("#modal-title").textContent=title;
+  document.querySelector("#modal-body").textContent=body;
+  const c=companies[0];
+  document.querySelector("#modal-score").innerHTML=`<div><span>Score</span><strong>${campaignScore()} / 100</strong></div><div><span>Net worth</span><strong>${money.format(accountEquity())}</strong></div><div><span>Nova cash</span><strong>$${c.companyCash.toFixed(2)}m</strong></div><div><span>Market share</span><strong>${pct(c.marketShare)}</strong></div>`;
+  document.querySelector("#game-modal").classList.remove("hidden");
+}
+
+function makeSavePayload() {
+  return {version:5,companies,state,orderId,savedAt:new Date().toISOString()};
+}
+
+function applySavePayload(payload, label="Saved game loaded.") {
+  if (!payload || payload.version!==5) throw new Error("Unsupported save version");
+  restoreArray(companies,payload.companies); restoreObject(state,payload.state); orderId=payload.orderId||0;
+  if (!Array.isArray(state.aiFunds)) state.aiFunds=createAiFunds();
+  if (!Array.isArray(state.institutionActivity)) state.institutionActivity=[];
+  if (!Array.isArray(state.marketRipples)) state.marketRipples=[];
+  if (!Array.isArray(state.unlockedMilestones)) state.unlockedMilestones=["basic"];
+  if (!Array.isArray(state.equityHistory)) state.equityHistory=[accountEquity()];
+  if (!Number.isFinite(state.dayStartEquity)) state.dayStartEquity=accountEquity();
+  companies.forEach(c=>{if(!c.book)c.book={bids:[],asks:[]};seedBook(c);});
+  document.querySelector("#difficulty").value=state.difficulty;
+  document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); message(label,true); render(); return true;
+}
+
+function saveGame() {
+  const payload=makeSavePayload();
+  localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+  addLedger("Game saved",0); render();
+}
+
+function loadGame() {
+  const raw=localStorage.getItem(SAVE_KEY);
+  if (!raw) return message("No saved game was found in this browser.",false);
+  try {
+    const payload=JSON.parse(raw);
+    return applySavePayload(payload,"Saved game loaded.");
+  } catch { message("The saved game could not be loaded.",false); return false; }
+}
+
+function cloudConfig() {
+  return window.MARKET_FOUNDRY_SUPABASE || {};
+}
+
+function cloudReady() {
+  const config=cloudConfig();
+  return Boolean(window.supabase && config.url && config.anonKey && supabaseClient);
+}
+
+function updateCloudStatus(text) {
+  const status=document.querySelector("#cloud-status");
+  if (!status) return;
+  if (text) { status.textContent=text; return; }
+  const config=cloudConfig();
+  if (!window.supabase) status.textContent="Cloud library could not load. Local saves still work.";
+  else if (!config.url || !config.anonKey) status.textContent="Cloud saves are not configured yet. Local saves still work.";
+  else if (currentUser) status.textContent=`Signed in as ${currentUser.email}. Cloud saves are ready.`;
+  else status.textContent="Cloud is configured. Sign in or create an account.";
+  document.querySelector("#auth-sign-out").disabled=!currentUser;
+  document.querySelector("#cloud-save").disabled=!currentUser;
+  document.querySelector("#cloud-load").disabled=!currentUser;
+}
+
+function initCloud() {
+  const config=cloudConfig();
+  if (!window.supabase || !config.url || !config.anonKey) { updateCloudStatus(); return; }
+  supabaseClient=window.supabase.createClient(config.url,config.anonKey);
+  supabaseClient.auth.getUser().then(({data})=>{ currentUser=data.user; updateCloudStatus(); });
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{ currentUser=session?session.user:null; updateCloudStatus(); });
+}
+
+function authFields() {
+  return {
+    email:document.querySelector("#auth-email").value.trim(),
+    password:document.querySelector("#auth-password").value
+  };
+}
+
+async function signUp() {
+  if (!supabaseClient) return updateCloudStatus("Add your Supabase URL and anon key first.");
+  const {email,password}=authFields();
+  if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.");
+  const {error}=await supabaseClient.auth.signUp({email,password});
+  if (error) return updateCloudStatus(error.message);
+  updateCloudStatus("Account created. Check your email if confirmation is enabled, then sign in.");
+}
+
+async function signIn() {
+  if (!supabaseClient) return updateCloudStatus("Add your Supabase URL and anon key first.");
+  const {email,password}=authFields();
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if (error) return updateCloudStatus(error.message);
+  currentUser=data.user; updateCloudStatus();
+}
+
+async function signOut() {
+  if (!supabaseClient) return;
+  await supabaseClient.auth.signOut();
+  currentUser=null; updateCloudStatus("Signed out. Browser saves still work.");
+}
+
+async function cloudSaveGame() {
+  if (!cloudReady()) return updateCloudStatus("Sign in before using cloud saves.");
+  const payload=makeSavePayload();
+  const {error}=await supabaseClient.from("saved_games").upsert({
+    user_id:currentUser.id,
+    slot:"main",
+    payload,
+    updated_at:new Date().toISOString()
+  },{onConflict:"user_id,slot"});
+  if (error) return updateCloudStatus(error.message);
+  localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+  addLedger("Cloud save complete",0); updateCloudStatus("Cloud save complete."); render();
+}
+
+async function cloudLoadGame() {
+  if (!cloudReady()) return updateCloudStatus("Sign in before using cloud saves.");
+  const {data,error}=await supabaseClient.from("saved_games").select("payload,updated_at").eq("user_id",currentUser.id).eq("slot","main").maybeSingle();
+  if (error) return updateCloudStatus(error.message);
+  if (!data) return updateCloudStatus("No cloud save found for this account.");
+  try {
+    localStorage.setItem(SAVE_KEY,JSON.stringify(data.payload));
+    applySavePayload(data.payload,"Cloud save loaded.");
+    updateCloudStatus(`Cloud save loaded from ${new Date(data.updated_at).toLocaleString()}.`);
+  } catch {
+    updateCloudStatus("The cloud save could not be loaded.");
+  }
+}
+
+function newGame(startTutorial=false) {
+  restoreArray(companies,initialCompanies); restoreObject(state,initialState); orderId=0;
+  state.difficulty=document.querySelector("#difficulty").value;
+  const settings=difficultySettings(); companies[0].unitCost*=settings.costMultiplier; companies[0].products.forEach(p=>p.unitCost*=settings.costMultiplier); companies.forEach(c=>c.volatility*=settings.volatility);
+  companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message("New campaign started. Your first task: review Nova Core and place a small trade.",true);
+  if (startTutorial) beginTutorial();
+}
+
+function restoreArray(target,source) { target.splice(0,target.length,...JSON.parse(JSON.stringify(source))); }
+function restoreObject(target,source) { Object.keys(target).forEach(key=>delete target[key]); Object.assign(target,JSON.parse(JSON.stringify(source))); }
+
+function updateAiCompany(company) {
+  const e=state.economy;
+  const cycle=(e.growth-.02)*company.cycleSensitivity*.06;
+  const inflation=-Math.max(0,e.inflation-.025)*company.inflationSensitivity*.04;
+  const fuel=company.ticker==="AXIS"?-(e.fuelIndex/100-1)*.003:0;
+  const policy=company.ticker==="GRNW"&&e.inflation<.045?.0015:0;
+  company.profit=Math.max(1,company.profit*(1+cycle+inflation+fuel+policy+(Math.random()-.5)*.004));
+  company.revenue=Math.max(1,company.revenue*(1+cycle*.7+(Math.random()-.5)*.002));
+}
+
+function estimatedFairPrice(company) {
+  const dilutionFactor=company.totalShares?1000000/company.totalShares:1;
+  const rateMultiple=Math.max(9,20-state.economy.interestRate*120);
+  return Math.max(4,company.profit*rateMultiple/10*dilutionFactor);
+}
+
+function institutionalScore(fund,company) {
+  const fairGap=estimatedFairPrice(company)/company.price-1;
+  const recent=company.history.length>5?company.price/company.history.at(-6)-1:0;
+  const debtLoad=company.debt/Math.max(1,company.revenue);
+  if (fund.strategy==="Value") return fairGap+company.dividendYield*2-debtLoad*.08;
+  if (fund.strategy==="Momentum") return recent*2+(company.price/company.previous-1)*3;
+  if (fund.strategy==="Short seller") return -(fairGap+company.growth*.2-debtLoad*.18);
+  const sectorBoost=company.ticker==="GRNW"?(.045-state.economy.inflation)*2:company.ticker==="HARB"?(100-state.economy.confidence)/500:company.ticker==="AXIS"?-(state.economy.fuelIndex/100-1):state.economy.growth-.02;
+  return sectorBoost+fairGap*.35;
+}
+
+function runInstitutionalTraders() {
+  state.aiFunds.forEach(fund=>{
+    if (Math.random()>.72) return;
+    const ranked=companies.map(company=>({company,score:institutionalScore(fund,company)})).sort((a,b)=>b.score-a.score);
+    let choice=ranked[0], side="buy";
+    if (fund.strategy==="Short seller" || choice.score<-.025) { choice=ranked.at(-1); side="sell"; }
+    const company=choice.company, held=fund.holdings[company.ticker]||0;
+    if (side==="sell" && fund.strategy!=="Short seller" && held<=0) return;
+    const conviction=Math.min(1,Math.abs(choice.score)*7+.15);
+    let quantity=Math.max(20,Math.floor((40+Math.random()*180)*conviction));
+    if (side==="buy") quantity=Math.min(quantity,Math.floor(fund.cash/company.price));
+    else if (fund.strategy!=="Short seller") quantity=Math.min(quantity,held);
+    if (quantity<10) return;
+    const value=quantity*company.price;
+    fund.cash+=side==="buy"?-value:value;
+    fund.holdings[company.ticker]=held+(side==="buy"?quantity:-quantity);
+    if (!fund.holdings[company.ticker]) delete fund.holdings[company.ticker];
+    const pressure=Math.min(.018,quantity/12000)*(side==="buy"?1:-1);
+    company.price=Math.max(2,company.price*(1+pressure));
+    const activity={day:state.day,fund:fund.name,ticker:company.ticker,side,quantity,price:company.price};
+    state.institutionActivity.unshift(activity);
+    state.institutionActivity=state.institutionActivity.slice(0,10);
+    if (quantity>=100) {
+      state.news.unshift({day:state.day,ticker:company.ticker,impact:pressure,text:`${fund.name} ${side==="buy"?"accumulated":"sold"} a large ${company.ticker} position.`});
+      state.news=state.news.slice(0,6);
+    }
+  });
+}
+
+function updateEconomy() {
+  const e=state.economy;
+  e.growth=Math.max(-.04,Math.min(.065,e.growth+(Math.random()-.5)*.004));
+  e.inflation=Math.max(-.005,Math.min(.09,e.inflation+(Math.random()-.5)*.003+(e.growth-.025)*.015));
+  const targetRate=Math.max(.005,e.inflation+.012);
+  e.interestRate=Math.max(.005,Math.min(.11,e.interestRate+(targetRate-e.interestRate)*.025));
+  e.confidence=Math.max(55,Math.min(135,e.confidence+(e.growth-.018)*18-(e.inflation-.03)*8+(Math.random()-.5)*2));
+  e.fuelIndex=Math.max(65,Math.min(180,e.fuelIndex*(1+(Math.random()-.49)*.012+Math.max(0,e.inflation-.03)*.02)));
+  const oldRegime=e.regime;
+  e.regime=e.growth<-.005?"Recession":e.inflation>.055?"Inflation shock":e.growth>.04?"Economic boom":e.confidence<80?"Cautious slowdown":"Steady expansion";
+  if (e.regime!==oldRegime) {
+    state.news.unshift({day:state.day,text:`The economy has entered a new regime: ${e.regime}.`,impact:e.growth<0?-.04:.025,ticker:"ECONOMY"});
+    state.news=state.news.slice(0,6);
+  }
+}
+
+function processOpenOrders() {
+  const remaining=[];
+  for (const order of state.openOrders) {
+    const company=companies.find(c=>c.ticker===order.ticker);
+    order.type=order.type||"limit";
+    if ((order.type==="stop"||order.type==="stop-limit") && !order.triggered) {
+      order.triggered=order.side==="buy"?company.price>=order.stop:company.price<=order.stop;
+      if (!order.triggered) { remaining.push(order); continue; }
+      addLedger(`${order.ticker} ${order.type} trigger reached`,0);
+    }
+    if (order.type==="stop") {
+      const result=executeMarketTrade(company,order.side,order.quantity,null,false);
+      if (!result.ok) remaining.push(order);
+      continue;
+    }
+    const best=order.side === "buy" ? company.book.asks[0]?.price : company.book.bids[0]?.price;
+    const marketable=best!==undefined && (order.side === "buy" ? best<=order.limit : best>=order.limit);
+    if (!marketable) { remaining.push(order); continue; }
+    const result=executeMarketTrade(company,order.side,order.quantity,order.limit,false);
+    if (!result.ok) remaining.push(order);
+  }
+  state.openOrders=remaining;
+}
+
+function payDividends() {
+  let net=0;
+  companies.forEach(company=>{
+    const shares=state.holdings[company.ticker]||0;
+    if (!shares || !company.dividendYield) return;
+    const payment=shares*company.price*company.dividendYield/4;
+    state.cash+=payment; net+=payment;
+    addLedger(`${payment>=0?"Dividend received":"Dividend owed on short"}: ${company.ticker}`,payment);
+  });
+  if (net!==0) state.news.unshift({day:state.day,text:`Quarterly dividends changed your cash balance by ${money.format(net)}.`,impact:0,ticker:"ACCOUNT"});
+}
+
+function runPlayerCompany(company) {
+  if (company.pendingDecisions) {
+    const pending=company.pendingDecisions;
+    Object.assign(company.products[pending.productIndex],pending.product);
+    company.research=pending.research;
+    company.pendingDecisions=null;
+    document.querySelector("#operations-status").textContent=`Active from day ${state.day}`;
+  }
+  const macroDemand=Math.max(.55,Math.min(1.35,state.economy.confidence/100*(1+(state.economy.growth-.02)*3)));
+  const logisticsEfficiency=companies.find(c=>c.ticker==="AXIS")?.controlled ? .94 : 1;
+  const energyEfficiency=companies.find(c=>c.ticker==="GRNW")?.controlled ? .97 : 1;
+  const retailSynergy=companies.find(c=>c.ticker==="HARB")?.controlled ? .08 : 0;
+  let totalRevenue=0,totalProductionCost=0,totalMarketing=0,totalSold=0,totalInventory=0;
+  for (const product of company.products.filter(p=>p.active)) {
+    product.competitorPrice=Math.max(product.unitCost*1.25,product.competitorPrice*(1+(Math.random()-.5)*.018+state.economy.inflation/240));
+    const relativePrice=product.competitorPrice/product.price;
+    const priceAppeal=Math.max(.3,Math.min(1.8,relativePrice**1.35));
+    const marketingLift=1+Math.sqrt(product.marketing/100)*.16+retailSynergy;
+    const qualityLift=Math.max(.65,.65+product.quality*.35);
+    const demand=Math.max(80,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand*(.9+Math.random()*.2)));
+    const inflatedUnitCost=product.unitCost*(1+Math.max(-.02,state.economy.inflation)*1.4)*logisticsEfficiency*energyEfficiency;
+    const discretionaryCost=(product.marketing+company.research/company.products.filter(p=>p.active).length)*1000;
+    const availableCash=Math.max(0,company.companyCash*1000000-totalProductionCost*1000000-totalMarketing*1000-discretionaryCost);
+    const produced=Math.min(product.production,Math.floor(availableCash/inflatedUnitCost));
+    const available=product.inventory+produced;
+    const sold=Math.min(available,demand);
+    product.inventory=available-sold; product.dailySales=sold;
+    totalSold+=sold; totalInventory+=product.inventory; totalRevenue+=sold*product.price/1000000;
+    totalProductionCost+=produced*inflatedUnitCost/1000000; totalMarketing+=product.marketing;
+  }
+  company.dailyInterest=company.bondDebt*company.bondRate/240;
+  const operatingCost=(totalMarketing+company.research)/1000+.12;
+  const subsidiaryIncome=companies.slice(1).reduce((sum,target)=>sum+(target.profit/240)*target.novaStake,0);
+  const synergy=controlledSubsidiaries().reduce((sum,target)=>sum+acquisitionSynergy(target),0);
+  const profit=totalRevenue-totalProductionCost-operatingCost-company.dailyInterest+subsidiaryIncome+synergy;
+  company.inventory=totalInventory;
+  company.companyCash=Math.max(0,company.companyCash+profit);
+  company.dailySales=totalSold;
+  company.dailyRevenue=totalRevenue;
+  company.dailyOperatingProfit=profit;
+  const researchSynergy=companies.find(c=>c.ticker==="MEDI")?.controlled?1.35:1;
+  company.products.filter(p=>p.active).forEach(p=>p.quality=Math.min(1.75,p.quality+company.research/250000/company.products.filter(x=>x.active).length*researchSynergy));
+  company.quality=company.products.filter(p=>p.active).reduce((sum,p)=>sum+p.quality,0)/company.products.filter(p=>p.active).length;
+  company.marketShare=Math.max(.04,Math.min(.6,company.marketShare*.94+(totalSold/9000)*.06));
+  company.revenue=Math.max(1,Math.round(company.revenue*.985+totalRevenue*240*.015));
+  company.profit=Math.round((company.profit*.985+profit*240*.015)*10)/10;
+  company.growth=Math.max(-.25,Math.min(.4,(company.dailySales/1800-1)*.12+(company.quality-1)*.08));
+  if (company.companyCash<2) {
+    state.news.unshift({day:state.day,text:"Nova Devices warns that its cash reserves are dangerously low.",impact:-.06,ticker:company.ticker});
+    state.news=state.news.slice(0,6);
+  }
+}
+
+function controlledSubsidiaries() { return companies.slice(1).filter(c=>c.controlled); }
+
+function acquisitionSynergy(target) {
+  const effects={GRNW:.006,HARB:.006,AXIS:.008,MEDI:.006};
+  return effects[target.ticker]||0;
+}
+
+function takeoverBlockCost(target) {
+  const marketCap=target.price*target.totalShares/1000000;
+  const controlPremium=1.12+target.novaStake*.5+target.takeoverDefense;
+  return marketCap*.1*controlPremium;
+}
+
+function acquisitionAssetValue() {
+  return companies.slice(1).reduce((sum,target)=>sum+target.price*target.totalShares/1000000*target.novaStake,0);
+}
+
+function buyTakeoverBlock(ticker) {
+  const nova=companies[0], target=companies.find(c=>c.ticker===ticker);
+  if (!featureUnlocked("ma")) return takeoverMessage("M&A unlocks at $145,000 net worth or day 90.",false);
+  if (!hasControl()) return takeoverMessage("You need board control before Nova can pursue an acquisition.",false);
+  if (!target || target.controlled) return takeoverMessage("This target is already controlled by Nova.",false);
+  const cost=takeoverBlockCost(target);
+  if (nova.companyCash<cost+2) return takeoverMessage(`Nova needs ${money.format(cost*1000000)} plus a $2m cash reserve.`,false);
+  nova.companyCash-=cost;
+  target.novaStake=Math.min(.5,Math.round((target.novaStake+.1)*100)/100);
+  target.price*=1.035;
+  if (target.novaStake>=.5) {
+    target.controlled=true;
+    nova.marketShare=Math.min(.6,nova.marketShare+.025);
+    state.news.unshift({day:state.day,text:`Nova Devices gained control of ${target.name}.`,impact:.05,ticker:"NOVA"});
+    takeoverMessage(`${target.name} is now a controlled subsidiary and contributes earnings and synergies.`,true);
+  } else {
+    state.news.unshift({day:state.day,text:`Nova Devices increased its stake in ${target.name} to ${pct(target.novaStake)}.`,impact:.025,ticker:target.ticker});
+    takeoverMessage(`Nova purchased another 10% of ${target.name}.`,true);
+  }
+  state.news=state.news.slice(0,6); seedBook(target); render();
+}
+
+function sellTakeoverBlock(ticker) {
+  const nova=companies[0], target=companies.find(c=>c.ticker===ticker);
+  if (!target || target.novaStake<.1) return takeoverMessage("Nova has no 10% block available to sell.",false);
+  const wasControlled=target.controlled;
+  const proceeds=target.price*target.totalShares/1000000*.1*.95;
+  target.novaStake=Math.max(0,Math.round((target.novaStake-.1)*100)/100);
+  nova.companyCash+=proceeds;
+  if (wasControlled && target.novaStake<.5) {
+    target.controlled=false;
+    nova.marketShare=Math.max(.04,nova.marketShare-.025);
+    state.news.unshift({day:state.day,text:`Nova Devices surrendered control of ${target.name}.`,impact:-.04,ticker:"NOVA"});
+  }
+  takeoverMessage(`Nova sold 10% of ${target.name} for ${money.format(proceeds*1000000)}.`,true);
+  state.news=state.news.slice(0,6); render();
+}
+
+function takeoverMessage(text,good) {
+  state.takeoverNotice=text;
+  const el=document.querySelector("#takeover-status"); el.textContent=text; el.className=good?"up":"down";
+}
+
+function votingOwnership() {
+  const company=companies[0];
+  const portfolioVotes=Math.max(0,state.holdings[company.ticker]||0);
+  return (company.founderShares+portfolioVotes)/company.totalShares;
+}
+
+function hasControl() { return votingOwnership()>.5; }
+
+function corporateFinanceAction(action) {
+  const company=companies[0];
+  if (!hasControl()) return financeMessage("The board has removed you from control. Buy Nova shares to regain a majority.",false);
+  if (action==="bond") {
+    const newRate=Math.max(.035,state.economy.interestRate+.02+company.bondDebt*.001);
+    company.bondRate=company.bondDebt?((company.bondRate*company.bondDebt)+(newRate*10))/(company.bondDebt+10):newRate;
+    company.companyCash+=10; company.bondDebt+=10; company.debt+=10;
+    financeMessage(`Nova issued a $10m bond at ${(newRate*100).toFixed(1)}%.`,true);
+  } else if (action==="repay") {
+    const amount=Math.min(5,company.bondDebt);
+    if (!amount) return financeMessage("Nova has no outstanding game bonds to repay.",false);
+    if (company.companyCash<amount) return financeMessage("Nova does not have enough company cash.",false);
+    company.companyCash-=amount; company.bondDebt-=amount; company.debt-=amount;
+    financeMessage(`Nova repaid $${amount}m of debt.`,true);
+  } else if (action==="issue") {
+    const shares=50000, proceeds=shares*company.price/1000000;
+    company.totalShares+=shares; company.companyCash+=proceeds; company.price*=.97;
+    state.news.unshift({day:state.day,text:`Nova Devices issued 50,000 shares and raised ${money.format(proceeds*1000000)}.`,impact:-.03,ticker:company.ticker});
+    financeMessage("New shares raised cash but diluted every existing owner.",true);
+  } else if (action==="buyback") {
+    const shares=Math.min(25000,company.totalShares-company.founderShares-10000), cost=shares*company.price/1000000;
+    if (shares<=0) return financeMessage("There are not enough public shares available for another buyback.",false);
+    if (company.companyCash<cost+2) return financeMessage("Nova needs more company cash to fund this buyback safely.",false);
+    company.totalShares-=shares; company.companyCash-=cost; company.price*=1.025;
+    state.news.unshift({day:state.day,text:`Nova Devices repurchased ${shares.toLocaleString()} shares.`,impact:.025,ticker:company.ticker});
+    financeMessage("The buyback reduced public shares and increased your voting percentage.",true);
+  }
+  state.news=state.news.slice(0,6); seedBook(company); render();
+}
+
+function financeMessage(text,good) {
+  const el=document.querySelector("#finance-message"); el.textContent=text; el.className=good?"up":"down";
+}
+
+function applyManagementDecisions() {
+  if (!hasControl()) return financeMessage("You need majority voting control to set company strategy.",false);
+  const company=companies[0];
+  company.pendingDecisions={
+    productIndex:state.selectedProduct,
+    product:{price:+document.querySelector("#product-price").value,production:+document.querySelector("#production").value,marketing:+document.querySelector("#marketing").value},
+    research:+document.querySelector("#research").value
+  };
+  document.querySelector("#operations-status").textContent="Scheduled for next day";
+}
+
+function launchProduct(index) {
+  const company=companies[0], product=company.products[index];
+  if (!hasControl()) return financeMessage("Board control is required to approve a product launch.",false);
+  if (!product || product.active) return;
+  if (company.companyCash<product.launchCost+3) return financeMessage(`Nova needs $${product.launchCost+3}m to launch and retain a cash buffer.`,false);
+  company.companyCash-=product.launchCost; product.active=true; state.selectedProduct=index;
+  state.news.unshift({day:state.day,text:`Nova Devices launched ${product.name} for the ${product.segment.toLowerCase()} market.`,impact:.04,ticker:"NOVA"});
+  state.news=state.news.slice(0,6); render();
+}
+
+function stockPortfolioValue(){ return companies.reduce((sum,c)=>sum+(state.holdings[c.ticker]||0)*c.price,0); }
+function optionsPortfolioValue(){ return state.optionPositions.reduce((sum,position)=>sum+optionPositionValue(position),0); }
+function portfolioValue(){ return stockPortfolioValue()+optionsPortfolioValue(); }
+function accountEquity(){ return state.cash+portfolioValue(); }
+function pct(value){ return `${value>=0?"+":""}${(value*100).toFixed(2)}%`; }
+function message(text,good){ const el=document.querySelector("#trade-message"); el.textContent=text; el.className=good?"up":"down"; }
+
+function renderDashboard(worth,investments) {
+  const hero=document.querySelector("#hero-net-worth"),previous=Number(hero.dataset.value||worth),dailyPnl=worth-(state.dayStartEquity||state.startWorth);
+  hero.textContent=money.format(worth); hero.dataset.value=worth;
+  if (Math.abs(worth-previous)>.01) {
+    hero.className=worth>previous?"flash-up":"flash-down";
+    setTimeout(()=>hero.className="",320);
+  }
+  const pnl=document.querySelector("#hero-daily-pnl");
+  pnl.textContent=`${dailyPnl>=0?"\u25B2":"\u25BC"} ${money.format(Math.abs(dailyPnl))} today`;
+  pnl.className=`hero-pnl ${dailyPnl>=0?"up":"down"}`;
+  const history=[...(state.equityHistory||[]),worth].slice(-30),min=Math.min(...history),max=Math.max(...history);
+  document.querySelector("#equity-sparkline").innerHTML=history.map(value=>`<i style="height:${12+(value-min)/(max-min||1)*43}px"></i>`).join("");
+
+  const colors=["#3b82f6","#00d68f","#fbbf24","#ff4757","#a78bfa"],positions=companies.map((company,index)=>({company,index,value:Math.abs((state.holdings[company.ticker]||0)*company.price)})).filter(item=>item.value>0);
+  const total=positions.reduce((sum,item)=>sum+item.value,0);
+  let cursor=0;
+  const stops=positions.map(item=>{const start=cursor;cursor+=item.value/(total||1)*100;return `${colors[item.index]} ${start}% ${cursor}%`;});
+  document.querySelector("#allocation-ring").style.background=stops.length?`conic-gradient(${stops.join(",")})`:"#263244";
+  document.querySelector("#allocation-count").textContent=positions.length;
+  document.querySelector("#allocation-legend").innerHTML=positions.length?positions.map(item=>`<div><i style="background:${colors[item.index]}"></i><span>${item.company.ticker}</span><strong>${(item.value/total*100).toFixed(0)}%</strong></div>`).join(""):`<p style="color:var(--muted);font-size:11px">Your allocation appears after the first trade.</p>`;
+
+  const movers=[...companies].sort((a,b)=>Math.abs((b.price-b.previous)/b.previous)-Math.abs((a.price-a.previous)/a.previous)).slice(0,5);
+  document.querySelector("#top-movers").innerHTML=movers.map(company=>{const change=(company.price-company.previous)/company.previous;return `<div class="mover-row"><span><b>${company.ticker}</b><small>${company.name}</small></span><strong class="${change>=0?"up":"down"}">${pct(change)}</strong></div>`}).join("");
+
+  const shortExposure=companies.reduce((sum,c)=>sum+Math.max(0,-(state.holdings[c.ticker]||0))*c.price,0);
+  const buyingPower=Math.max(0,state.cash+accountEquity()*1.25-shortExposure);
+  document.querySelector("#buying-power").textContent=money.format(buyingPower);
+  document.querySelector("#margin-used").textContent=money.format(shortExposure);
+  document.querySelector("#trades-today").textContent=state.ledger.filter(item=>item.day===state.day&&/^(Bought|Sold)/.test(item.text)).length;
+  document.querySelector("#orders-count").textContent=state.openOrders.length;
+}
+
+function renderMarketOverview() {
+  const items=companies.map((company,index)=>({company,index,change:(company.price-company.previous)/company.previous,marketValue:company.price*(company.totalShares||1000000)}));
+  const rising=items.filter(item=>item.change>=0).length;
+  document.querySelector("#market-breadth").textContent=`${rising} advancing / ${items.length-rising} declining`;
+  document.querySelector("#market-heatmap").innerHTML=items.map(item=>{
+    const intensity=Math.min(.78,.22+Math.abs(item.change)*7),color=item.change>=0?`rgba(0,214,143,${intensity})`:`rgba(255,71,87,${intensity})`;
+    return `<button class="heatmap-tile" data-heatmap-index="${item.index}" style="background:${color}"><strong>${item.company.ticker}</strong><small>${item.company.sector}</small><span>${pct(item.change)}</span></button>`;
+  }).join("");
+  document.querySelectorAll("[data-heatmap-index]").forEach(button=>button.onclick=()=>{state.selected=+button.dataset.heatmapIndex;render();document.querySelector(".workspace").scrollIntoView({behavior:"smooth",block:"start"});});
+}
+
+function renderTickerTape() {
+  const markup=companies.map(company=>{const change=(company.price-company.previous)/company.previous;return `<span class="ticker-item ${change>=0?"up":"down"}"><b>${company.ticker}</b><span>${money.format(company.price)}</span><span>${change>=0?"\u25B2":"\u25BC"} ${Math.abs(change*100).toFixed(2)}%</span></span>`}).join("");
+  document.querySelector("#ticker-tape").innerHTML=markup+markup;
+}
+
+function renderStatusConsole(worth) {
+  const latest=state.news[0];
+  document.querySelector("#status-headline").textContent=latest?`DAY ${latest.day}: ${latest.text}`:"Market network online. Advance time to receive corporate news.";
+  document.querySelector("#status-cash").textContent=money.format(state.cash);
+  const profit=worth-state.startWorth,profitEl=document.querySelector("#status-profit");
+  profitEl.textContent=money.format(profit);
+  profitEl.className=profit>=0?"up":"down";
+  document.querySelector("#status-date").textContent=`DAY ${state.day} / YEAR ${Math.floor((state.day-1)/240)+1}`;
+}
+
+function renderChart(company) {
+  const canvas=document.querySelector("#chart"), ctx=canvas.getContext("2d"), dpr=window.devicePixelRatio||1;
+  const width=canvas.clientWidth, height=canvas.clientHeight; canvas.width=width*dpr; canvas.height=height*dpr; ctx.scale(dpr,dpr);
+  const data=company.history, min=Math.min(...data)*.98, max=Math.max(...data)*1.02, x=i=>20+i*(width-40)/(data.length-1), y=v=>height-20-(v-min)*(height-40)/(max-min||1);
+  ctx.clearRect(0,0,width,height); ctx.strokeStyle="#3484cf"; ctx.lineWidth=1;
+  for(let i=1;i<5;i++){ctx.beginPath();ctx.moveTo(20,i*height/5);ctx.lineTo(width-20,i*height/5);ctx.stroke();}
+  const rising=data.at(-1)>=data[0], color=rising?"#00f0a0":"#ff5264", gradient=ctx.createLinearGradient(0,0,0,height); gradient.addColorStop(0,rising?"#00f0a055":"#ff526455"); gradient.addColorStop(1,"transparent");
+  ctx.beginPath(); data.forEach((v,i)=>i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v))); ctx.lineTo(x(data.length-1),height-20);ctx.lineTo(20,height-20);ctx.closePath();ctx.fillStyle=gradient;ctx.fill();
+  ctx.beginPath();data.forEach((v,i)=>i?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)));ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+}
+
+function render() {
+  checkProgression();
+  const company=companies[state.selected], investments=portfolioValue(), worth=state.cash+investments, change=(company.price-company.previous)/company.previous;
+  document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/240)+1}, Q${Math.floor(((state.day-1)%240)/60)+1}, Day ${state.day}`;
+  document.querySelector("#cash").textContent=money.format(state.cash); document.querySelector("#investments").textContent=money.format(investments); document.querySelector("#net-worth").textContent=money.format(worth);
+  const returnEl=document.querySelector("#return"); returnEl.textContent=pct(worth/state.startWorth-1); returnEl.className=worth>=state.startWorth?"up":"down";
+  document.querySelector("#stock-list").innerHTML=companies.map((c,i)=>{const ch=(c.price-c.previous)/c.previous;return `<button class="stock ${i===state.selected?"active":""}" data-index="${i}"><span><strong>${c.ticker}</strong><small>${c.name}</small></span><span class="stock-price"><strong>${money.format(c.price)}</strong><small class="${ch>=0?"up":"down"}">${pct(ch)}</small></span></button>`}).join("");
+  document.querySelectorAll(".stock").forEach(el=>el.onclick=()=>{state.selected=+el.dataset.index;const selected=companies[state.selected];if(state.orderType==="limit"||state.orderType==="stop-limit")document.querySelector("#limit-price").value=selected.price.toFixed(2);if(state.orderType==="stop"||state.orderType==="stop-limit")document.querySelector("#stop-price").value=(selected.price*(state.side==="buy"?1.03:.97)).toFixed(2);message("",true);render();});
+  document.querySelector("#sector").textContent=company.sector;document.querySelector("#company-name").textContent=company.name;document.querySelector("#ticker").textContent=`NASDAQ: ${company.ticker}`;document.querySelector("#price").textContent=money.format(company.price);
+  const changeEl=document.querySelector("#change");changeEl.textContent=pct(change);changeEl.className=change>=0?"up":"down";
+  document.querySelector("#fundamentals").innerHTML=[["Revenue",`$${company.revenue}m`],["Net profit",`$${company.profit}m`],["Debt",`$${company.debt}m`],["Dividend yield",pct(company.dividendYield)]].map(x=>`<div><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join("");
+  const rows=orders=>orders.slice(0,5).map(o=>`<div class="order-row"><span class="${o.side==="buy"?"up":"down"}">${money.format(o.price)}</span><span>${o.quantity} shares</span></div>`).join("");
+  document.querySelector("#bids").innerHTML=rows(company.book.bids);document.querySelector("#asks").innerHTML=rows(company.book.asks);
+  const held=state.holdings[company.ticker]||0, avg=state.averageCost[company.ticker]||0;
+  const positionProfit=(company.price-avg)*held;
+  document.querySelector("#position").innerHTML=`<div><span>Position</span><strong>${held>0?`${held} long`:held<0?`${Math.abs(held)} short`:"None"}</strong></div><div><span>Average entry</span><strong>${held?money.format(avg):"-"}</strong></div><div><span>Unrealized P/L</span><strong class="${positionProfit>=0?"up":"down"}">${held?money.format(positionProfit):"-"}</strong></div>`;
+  const ownedCompanies=companies.filter(c=>state.holdings[c.ticker]);
+  document.querySelector("#portfolio").innerHTML=ownedCompanies.length
+    ? `<div class="portfolio-row"><span>Company</span><span>Position</span><span>Value</span><span>P/L</span></div>`+ownedCompanies.map(c=>{const h=state.holdings[c.ticker],pl=(c.price-state.averageCost[c.ticker])*h;return `<div class="portfolio-row"><span><strong>${c.ticker}</strong> ${c.name}</span><span>${h>0?`${h} long`:`${Math.abs(h)} short`}</span><span>${money.format(h*c.price)}</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span></div>`}).join("")
+    : `<p style="padding:20px;color:var(--muted)">Your portfolio is empty. Choose a company and place your first order.</p>`;
+  document.querySelector("#news").innerHTML=state.news.length?state.news.map(n=>`<div class="news-item"><time>DAY ${n.day} &middot; ${n.ticker}</time><p>${n.text} <strong class="${n.impact>=0?"up":"down"}">${pct(n.impact)}</strong></p></div>`).join(""):`<p style="padding:20px 4px;color:var(--muted)">No major news yet. Run the next day to move the market.</p>`;
+  renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFinance(); renderTakeovers(); updateEstimate(); renderChart(company);
+}
+
+function renderProgression() {
+  const next=progressionMilestones.find(milestone=>!featureUnlocked(milestone.id));
+  document.querySelector("#progression-status").textContent=next?`Next: ${next.name}`:"All licenses unlocked";
+  document.querySelector("#progression-list").innerHTML=progressionMilestones.map((milestone,index)=>{
+    const open=featureUnlocked(milestone.id),current=next?.id===milestone.id;
+    const requirement=milestone.id==="basic"?"Available immediately":`${money.format(milestone.worth)} net worth or day ${milestone.day}`;
+    return `<article class="progression-step ${open?"unlocked":""} ${current?"current":""}"><span class="step-number">LEVEL ${index+1}</span><h3>${milestone.name}</h3><p>${milestone.description}</p><strong class="${open?"up":""}">${open?"UNLOCKED":requirement}</strong></article>`;
+  }).join("");
+  const limitOpen=featureUnlocked("limit");
+  document.querySelector("#order-type-select").value=state.orderType;
+  const usesLimit=state.orderType==="limit"||state.orderType==="stop-limit",usesStop=state.orderType==="stop"||state.orderType==="stop-limit";
+  document.querySelector("#limit-price-label").classList.toggle("hidden",!usesLimit);
+  document.querySelector("#stop-price-label").classList.toggle("hidden",!usesStop);
+  [...document.querySelector("#order-type-select").options].forEach(option=>{if(option.value!=="market")option.disabled=!limitOpen;});
+  if (!limitOpen && state.orderType!=="market") {
+    state.orderType="market";
+    document.querySelector("#order-type-select").value="market";
+    document.querySelector("#limit-price-label").classList.add("hidden");
+    document.querySelector("#stop-price-label").classList.add("hidden");
+  }
+  document.querySelector("[data-side='sell']").textContent=featureUnlocked("short")?"Sell / Short":"Sell (short locked)";
+  document.querySelector(".options").classList.toggle("system-locked",!featureUnlocked("options"));
+  document.querySelector("#buy-option").disabled=!featureUnlocked("options");
+  document.querySelector(".takeovers").classList.toggle("system-locked",!featureUnlocked("ma"));
+}
+
+function renderInstitutions() {
+  const totalCapital=state.aiFunds.reduce((sum,fund)=>sum+fund.cash+companies.reduce((value,c)=>value+(fund.holdings[c.ticker]||0)*c.price,0),0);
+  document.querySelector("#institution-status").textContent=`${money.format(totalCapital)} managed capital`;
+  document.querySelector("#institution-list").innerHTML=state.aiFunds.map(fund=>{
+    const positions=companies.filter(c=>fund.holdings[c.ticker]).map(c=>`${c.ticker} ${fund.holdings[c.ticker]>0?"+":""}${fund.holdings[c.ticker]}`).join(" | ")||"All cash";
+    const worth=fund.cash+companies.reduce((sum,c)=>sum+(fund.holdings[c.ticker]||0)*c.price,0), performance=worth/fund.startWorth-1;
+    return `<article class="institution-card"><header><i style="color:${fund.color};background:${fund.color}"></i><div><h3>${fund.name}</h3><small>${fund.strategy} strategy</small></div></header><div class="institution-kpis"><span>Fund value<strong>${money.format(worth)}</strong></span><span>Return<strong class="${performance>=0?"up":"down"}">${pct(performance)}</strong></span><span>Cash<strong>${money.format(fund.cash)}</strong></span><span>Positions<strong>${Object.keys(fund.holdings).length}</strong></span></div><p class="institution-holdings">${positions}</p></article>`;
+  }).join("");
+  document.querySelector("#institution-activity").innerHTML=state.institutionActivity.length?state.institutionActivity.map(trade=>`<div class="institution-trade"><time>DAY ${trade.day}</time><span>${trade.fund}</span><span class="${trade.side==="buy"?"up":"down"}">${trade.side.toUpperCase()} ${trade.quantity} ${trade.ticker}</span><span>${money.format(trade.price)}</span></div>`).join(""):`<p style="padding:12px 0;color:var(--muted)">Advance time to see institutional orders enter the market.</p>`;
+}
+
+function renderOptions() {
+  const company=companies[state.selected], strikeSelect=document.querySelector("#option-strike"), current=+strikeSelect.value;
+  const strikes=[.8,.9,1,1.1,1.2].map(mult=>Math.max(1,Math.round(company.price*mult/5)*5));
+  const unique=[...new Set(strikes)];
+  strikeSelect.innerHTML=unique.map(strike=>`<option value="${strike}" ${strike===current?"selected":""}>${money.format(strike)}</option>`).join("");
+  if (!unique.includes(current)) strikeSelect.value=unique[Math.floor(unique.length/2)];
+  const type=state.optionType,strike=+strikeSelect.value,days=+document.querySelector("#option-expiry").value,contracts=Math.max(1,+document.querySelector("#option-contracts").value||1);
+  const premium=optionUnitPrice(company,type,strike,days),cost=premium*100*contracts;
+  document.querySelector("#options-underlying").textContent=`${company.name} (${company.ticker}) at ${money.format(company.price)}`;
+  document.querySelector("#options-status").textContent=featureUnlocked("options")?`${state.optionPositions.length} open contract position${state.optionPositions.length===1?"":"s"}`:"LOCKED - reach $125k or day 50";
+  document.querySelector("#option-premium").textContent=money.format(premium*100);
+  document.querySelector("#option-cost").textContent=money.format(cost);
+  document.querySelector("#buy-option").textContent=`Buy ${contracts} ${type}${contracts>1?"s":""}`;
+  const breakEven=type==="call"?strike+premium:strike-premium;
+  document.querySelector("#option-explanation").textContent=`Break-even at expiry: ${money.format(breakEven)}. ${days} days remain in the selected contract.`;
+  document.querySelector("#option-positions").innerHTML=state.optionPositions.length?state.optionPositions.map(position=>{
+    const value=optionPositionValue(position),entry=position.entryPremium*100*position.contracts,pl=value-entry,remaining=Math.max(0,position.expiryDay-state.day);
+    return `<div class="option-position"><span><strong>${position.ticker} ${position.type.toUpperCase()}</strong><small>${position.contracts} contract${position.contracts>1?"s":""}</small></span><span>${money.format(position.strike)} strike</span><span>${remaining} days</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span><button data-close-option="${position.id}">Close</button></div>`;
+  }).join(""):`<p style="padding:14px 0;color:var(--muted)">No open option positions.</p>`;
+  document.querySelectorAll("[data-close-option]").forEach(button=>button.onclick=()=>sellOptionPosition(+button.dataset.closeOption));
+}
+
+function renderFinancialReports() {
+  const company=companies[state.selected], report=company.reports[0];
+  document.querySelector("#report-company").textContent=`${company.name} (${company.ticker})`;
+  if (!report) {
+    document.querySelector("#earnings-signal").textContent="Awaiting first quarter";
+    document.querySelector("#earnings-signal").className="";
+    document.querySelector("#latest-report").innerHTML=`<div><span>Revenue estimate</span><strong>$${company.analystRevenue.toFixed(2)}m</strong></div><div><span>Profit estimate</span><strong>$${company.analystProfit.toFixed(2)}m</strong></div><div><span>Current revenue accrued</span><strong>$${company.quarterlyRevenue.toFixed(2)}m</strong></div><div><span>Current profit accrued</span><strong>$${company.quarterlyProfit.toFixed(2)}m</strong></div>`;
+    document.querySelector("#report-history").innerHTML=`<p style="padding:14px 0;color:var(--muted)">The first report publishes at the end of day 60.</p>`;
+    document.querySelector("#analyst-commentary").textContent="Expectations are forming. Advance time and monitor operating performance before the quarter closes.";
+    return;
+  }
+  const signal=report.combined>.025?"Earnings beat":report.combined<-.025?"Earnings miss":"In line";
+  document.querySelector("#earnings-signal").textContent=signal;
+  document.querySelector("#earnings-signal").className=report.combined>=.025?"up":report.combined<=-.025?"down":"";
+  const metrics=[
+    ["Revenue",`$${report.revenue.toFixed(2)}m`,report.revenueSurprise>=0],
+    ["Revenue surprise",pct(report.revenueSurprise),report.revenueSurprise>=0],
+    ["Net profit",`$${report.profit.toFixed(2)}m`,report.profit>=0],
+    ["Profit surprise",pct(report.profitSurprise),report.profitSurprise>=0],
+    ["Net margin",pct(report.margin),report.margin>=.08],
+    ["Cash",`$${report.cash.toFixed(2)}m`,report.cash>=5],
+    ["Debt",`$${report.debt.toFixed(1)}m`,report.debt<250],
+    ["Price reaction",pct(report.combined*.45),report.combined>=0]
+  ];
+  document.querySelector("#latest-report").innerHTML=metrics.map(m=>`<div><span>${m[0]}</span><strong class="${m[2]?"up":"down"}">${m[1]}</strong></div>`).join("");
+  document.querySelector("#report-history").innerHTML=`<div class="report-row"><span>Quarter</span><span>Revenue</span><span>Profit</span><span>Surprise</span></div>`+company.reports.map(r=>`<div class="report-row"><span>Q${r.quarter}</span><span>$${r.revenue.toFixed(1)}m</span><span>$${r.profit.toFixed(1)}m</span><span class="${r.combined>=0?"up":"down"}">${pct(r.combined)}</span></div>`).join("");
+  let commentary="Results were broadly balanced.";
+  if(report.profitSurprise>0&&report.revenueSurprise<0) commentary="Profit beat despite weak revenue. Investors may question whether cost cutting can sustain growth.";
+  else if(report.revenueSurprise>0&&report.profitSurprise<0) commentary="Revenue was strong, but margins disappointed. Growth is costing more than analysts expected.";
+  else if(report.profitSurprise>.08&&report.margin>.1) commentary="A high-quality beat: profit, margin, and revenue support the positive reaction.";
+  else if(report.combined<-.05) commentary="The miss was material. The next estimate has been reset lower, but credibility has weakened.";
+  document.querySelector("#analyst-commentary").textContent=commentary;
+}
+
+const advisorTips=[
+  {title:"Start with the business",text:"Review Nova Core in Product Portfolio. Set a competitive price, sensible production, marketing, and research, then apply the decisions before advancing time."},
+  {title:"Watch cash and inventory",text:"Company cash belongs to Nova, while the cash at the top belongs to your trading account. Excess inventory traps corporate cash; stockouts leave demand unserved."},
+  {title:"Trade what you understand",text:"Use the market panel to inspect fundamentals and the order book. Market orders trade immediately; limit orders wait. Shorts profit when shares fall. Options offer leveraged calls and puts with losses capped at the premium."},
+  {title:"Choose funding carefully",text:"Bonds preserve ownership but add interest expense. New shares raise cash but dilute voting control and per-share value. Buybacks reverse dilution when Nova has spare cash."},
+  {title:"Expand with discipline",text:"Launch Value or Pro only when Nova can fund the launch and keep a cash buffer. Acquisitions add earnings and synergies, but takeover premiums rise as rival boards resist."},
+  {title:"Read the economy",text:"Interest rates affect valuations and bond coupons. Confidence drives product demand, inflation raises production costs, and different industries react differently to recessions."},
+  {title:"Win Year One",text:"By day 240, meet the net-worth and market-share targets, keep Nova solvent, and protect voting control. Use +1 week or +1 month only after your operating decisions are stable."}
+];
+
+function renderAdvisor() {
+  const panel=document.querySelector("#advisor");
+  panel.classList.toggle("hidden",state.advisorHidden);
+  const tip=advisorTips[Math.min(state.advisorStep,advisorTips.length-1)];
+  document.querySelector("#advisor-title").textContent=tip.title;
+  document.querySelector("#advisor-text").textContent=tip.text;
+  document.querySelector("#advisor-progress").textContent=`Tip ${state.advisorStep+1} of ${advisorTips.length}`;
+  document.querySelector("#advisor-next").textContent=state.advisorStep===advisorTips.length-1?"Finish guide":"Next tip";
+}
+
+function nextAdvisorTip() {
+  if (state.advisorStep>=advisorTips.length-1) state.advisorHidden=true;
+  else state.advisorStep++;
+  render();
+}
+
+function renderCampaign() {
+  const c=companies[0], s=difficultySettings(), daysLeft=Math.max(0,240-state.day);
+  document.querySelector("#campaign-status").textContent=state.gameOver?"Campaign ended":`${daysLeft} trading days remaining`;
+  const objectives=[
+    ["Personal net worth",money.format(accountEquity()),accountEquity()>=s.targetWorth,`Target ${money.format(s.targetWorth)}`],
+    ["Nova market share",pct(c.marketShare),c.marketShare>=s.targetShare,`Target ${pct(s.targetShare)}`],
+    ["Company liquidity",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0,"Stay above $0"],
+    ["Voting control",pct(votingOwnership()),hasControl(),"Keep above 50%"]
+  ];
+  document.querySelector("#objective-list").innerHTML=objectives.map(o=>`<div class="objective"><span>${o[0]} &middot; ${o[3]}</span><strong class="${o[2]?"up":"down"}">${o[1]}</strong></div>`).join("");
+  document.querySelector("#next-day").disabled=state.gameOver;
+  document.querySelector("#next-week").disabled=state.gameOver;
+  document.querySelector("#next-month").disabled=state.gameOver;
+}
+
+function renderEconomy() {
+  const e=state.economy;
+  document.querySelector("#economic-regime").textContent=e.regime;
+  const positive=e.growth>0&&e.confidence>=90&&e.inflation<.05;
+  document.querySelector("#economy-outlook").textContent=positive?"Risk appetite healthy":e.growth<0?"Defensive conditions":"Mixed conditions";
+  document.querySelector("#economy-outlook").className=positive?"up":e.growth<0?"down":"";
+  const values=[
+    ["Policy rate",pct(e.interestRate),e.interestRate<.06],
+    ["Inflation",pct(e.inflation),e.inflation<.04],
+    ["GDP growth",pct(e.growth),e.growth>0],
+    ["Confidence",e.confidence.toFixed(0),e.confidence>=90],
+    ["Fuel index",e.fuelIndex.toFixed(1),e.fuelIndex<120]
+  ];
+  document.querySelector("#economy-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
+  document.querySelector("#market-ripples").innerHTML=state.marketRipples.length?state.marketRipples.slice(0,3).map(ripple=>{
+    const effects=ripple.effects.map(effect=>`<span class="${effect.impact>=0?"up":"down"}">${effect.ticker} ${pct(effect.impact)}</span>`).join("");
+    const rates=ripple.rateShift?`<span class="${ripple.rateShift>0?"down":"up"}">Rates ${pct(ripple.rateShift)}</span>`:"";
+    return `<article class="ripple-card"><header><strong class="${ripple.impact>=0?"up":"down"}">${ripple.source} ${pct(ripple.impact)}</strong><time>DAY ${ripple.day}</time></header><p>${ripple.headline}</p><div class="ripple-effects">${effects}${rates}</div></article>`;
+  }).join(""):`<p style="color:var(--muted)">Company shocks and their secondary market effects will appear here.</p>`;
+}
+
+function renderActivity() {
+  document.querySelector("#open-orders").innerHTML=state.openOrders.length
+    ? state.openOrders.map(o=>{const type=(o.type||"limit").toUpperCase(),prices=[o.stop?`S ${money.format(o.stop)}`:"",o.limit?`L ${money.format(o.limit)}`:""].filter(Boolean).join(" / ");return `<div class="activity-row"><span><strong>${o.ticker}</strong><small>${o.side.toUpperCase()} ${type}${o.triggered&&o.type?.startsWith("stop")?" - TRIGGERED":""}</small></span><span>${o.quantity} shares</span><span>${prices}</span><button data-cancel-order="${o.id}">Cancel</button></div>`}).join("")
+    : `<p style="padding:18px 4px;color:var(--muted)">No open conditional orders.</p>`;
+  document.querySelectorAll("[data-cancel-order]").forEach(button=>button.onclick=()=>{
+    state.openOrders=state.openOrders.filter(order=>order.id!==+button.dataset.cancelOrder);
+    addLedger("Canceled limit order",0); render();
+  });
+  document.querySelector("#ledger").innerHTML=state.ledger.length
+    ? state.ledger.map(item=>`<div class="ledger-row"><time>DAY ${item.day}</time><span>${item.text}</span><span class="${item.amount>0?"up":item.amount<0?"down":""}">${item.amount?money.format(item.amount):""}</span></div>`).join("")
+    : `<p style="padding:18px 4px;color:var(--muted)">Trades, dividends, and order activity will appear here.</p>`;
+}
+
+function renderOperations() {
+  const c=companies[0], selected=c.products[state.selectedProduct]?.active?c.products[state.selectedProduct]:c.products.find(p=>p.active), selectedIndex=c.products.indexOf(selected);
+  state.selectedProduct=selectedIndex;
+  const pending=c.pendingDecisions?.productIndex===selectedIndex?c.pendingDecisions:null;
+  const product=pending?.product||selected;
+  const controls={"product-price":product.price,"production":product.production,"marketing":product.marketing,"research":pending?.research??c.research};
+  Object.entries(controls).forEach(([id,value])=>{const input=document.querySelector(`#${id}`);if(document.activeElement!==input)input.value=value;});
+  document.querySelector("#active-product-name").textContent=`Managing ${selected.name} - ${selected.segment} segment`;
+  refreshDecisionLabels(false);
+  const activeProduction=c.products.filter(p=>p.active).reduce((sum,p)=>sum+p.production,0);
+  const values=[
+    ["Company cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>=5],
+    ["Units sold",c.dailySales.toLocaleString(),c.dailySales>=activeProduction*.8],
+    ["Inventory",c.inventory.toLocaleString(),c.inventory<5000],
+    ["Daily profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
+    ["Portfolio quality",`${Math.round(c.quality*100)} / 175`,c.quality>=1],
+    ["Market share",pct(c.marketShare),c.marketShare>=.15]
+  ];
+  document.querySelector("#operations-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
+  let advice="Operations are balanced.";
+  if(c.inventory>5000) advice="Inventory is piling up. Reduce production or lower the product price.";
+  else if(c.dailySales>0 && c.inventory<300) advice="Demand is outrunning supply. Increase production or test a higher price.";
+  else if(c.dailyOperatingProfit<0) advice="The company is losing money. Review production and discretionary budgets.";
+  else if(c.companyCash<5) advice="Cash is tight. Protect liquidity before funding aggressive growth.";
+  document.querySelector("#management-advice").textContent=advice;
+  document.querySelector("#apply-decisions").disabled=!hasControl();
+  renderProducts();
+}
+
+function renderProducts() {
+  const c=companies[0];
+  document.querySelector("#product-list").innerHTML=c.products.map((product,index)=>{
+    if (!product.active) return `<article class="product-card"><header><div><h3>${product.name}</h3><span>${product.segment} segment</span></div><strong>LOCKED</strong></header><p>Launch cost: $${product.launchCost}m. Initial unit cost: ${money.format(product.unitCost)}.</p><button data-launch-product="${index}" ${!hasControl()?"disabled":""}>Launch ${product.name}</button></article>`;
+    const priceGap=product.price/product.competitorPrice-1;
+    return `<article class="product-card ${index===state.selectedProduct?"selected":""}"><header><div><h3>${product.name}</h3><span>${product.segment} segment</span></div><strong class="${priceGap<=0?"up":"down"}">${priceGap<=0?"VALUE":"PREMIUM"}</strong></header><div class="product-stats"><span>Nova price<strong>${money.format(product.price)}</strong></span><span>Competitor<strong>${money.format(product.competitorPrice)}</strong></span><span>Daily sales<strong>${product.dailySales.toLocaleString()}</strong></span><span>Inventory<strong>${product.inventory.toLocaleString()}</strong></span><span>Quality<strong>${Math.round(product.quality*100)} / 175</strong></span><span>Unit cost<strong>${money.format(product.unitCost)}</strong></span></div><button data-select-product="${index}">${index===state.selectedProduct?"Currently managing":"Manage product"}</button></article>`;
+  }).join("");
+  document.querySelectorAll("[data-select-product]").forEach(button=>button.onclick=()=>{state.selectedProduct=+button.dataset.selectProduct;render();});
+  document.querySelectorAll("[data-launch-product]").forEach(button=>button.onclick=()=>launchProduct(+button.dataset.launchProduct));
+}
+
+function renderFinance() {
+  const c=companies[0], ownership=votingOwnership(), controlled=hasControl();
+  const publicShares=c.totalShares-c.founderShares;
+  document.querySelector("#control-status").textContent=controlled?"Board controlled":"Control lost";
+  document.querySelector("#control-status").className=controlled?"up":"down";
+  const values=[
+    ["Voting ownership",pct(ownership),controlled],
+    ["Founder shares",c.founderShares.toLocaleString(),true],
+    ["Portfolio votes",Math.max(0,state.holdings[c.ticker]||0).toLocaleString(),true],
+    ["Shares outstanding",c.totalShares.toLocaleString(),c.totalShares<=1100000],
+    ["Public shares",publicShares.toLocaleString(),true],
+    ["Bond debt",`$${c.bondDebt.toFixed(1)}m`,c.bondDebt<20],
+    ["Average coupon",pct(c.bondRate),c.bondRate<.07],
+    ["Daily interest",`$${c.dailyInterest.toFixed(3)}m`,c.dailyInterest<.005],
+    ["Company cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>=5]
+    ,["Strategic assets",`$${acquisitionAssetValue().toFixed(2)}m`,acquisitionAssetValue()>0]
+  ];
+  document.querySelector("#finance-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
+  document.querySelectorAll("[data-finance-action]").forEach(button=>button.disabled=!controlled);
+  if(!controlled && !document.querySelector("#finance-message").textContent) financeMessage("Buy additional Nova shares in the market to rebuild a majority voting stake.",false);
+}
+
+function renderTakeovers() {
+  const synergies={
+    GRNW:"Energy integration lowers long-run operating risk.",
+    HARB:"Retail distribution strengthens consumer reach.",
+    AXIS:"Owned logistics improves supply-chain efficiency.",
+    MEDI:"Research expertise accelerates product quality gains."
+  };
+  document.querySelector("#takeover-status").textContent=featureUnlocked("ma")?(state.takeoverNotice||"No active takeover campaign"):"LOCKED - reach $145k or day 90";
+  document.querySelector("#takeover-targets").innerHTML=companies.slice(1).map(target=>{
+    const cost=takeoverBlockCost(target), sellValue=target.price*target.totalShares/1000000*.1*.95;
+    return `<article class="takeover-card">
+      <header><div><h3>${target.name}</h3><span>${target.ticker} &middot; ${target.sector}</span></div><strong class="${target.controlled?"up":""}">${target.controlled?"SUBSIDIARY":"INDEPENDENT"}</strong></header>
+      <div class="stake-bar"><i style="width:${target.novaStake*200}%"></i></div>
+      <div class="takeover-meta"><span>Nova stake<strong>${pct(target.novaStake)}</strong></span><span>Defense premium<strong>${pct(target.takeoverDefense)}</strong></span><span>Next 10%<strong>${money.format(cost*1000000)}</strong></span></div>
+      <div class="takeover-actions"><button data-buy-target="${target.ticker}" ${target.controlled||!hasControl()||!featureUnlocked("ma")?"disabled":""}>Buy 10%</button><button data-sell-target="${target.ticker}" ${target.novaStake<.1?"disabled":""}>Sell 10% (${money.format(sellValue*1000000)})</button></div>
+      <p>${synergies[target.ticker]}</p>
+    </article>`;
+  }).join("");
+  document.querySelectorAll("[data-buy-target]").forEach(button=>button.onclick=()=>buyTakeoverBlock(button.dataset.buyTarget));
+  document.querySelectorAll("[data-sell-target]").forEach(button=>button.onclick=()=>sellTakeoverBlock(button.dataset.sellTarget));
+}
+
+function refreshDecisionLabels(markDirty=true) {
+  document.querySelector("#product-price-value").textContent=money.format(+document.querySelector("#product-price").value);
+  document.querySelector("#production-value").textContent=`${(+document.querySelector("#production").value).toLocaleString()} units`;
+  document.querySelector("#marketing-value").textContent=`$${document.querySelector("#marketing").value}k/day`;
+  document.querySelector("#research-value").textContent=`$${document.querySelector("#research").value}k/day`;
+  if(markDirty) document.querySelector("#operations-status").textContent="Unsaved changes";
+}
+
+function updateEstimate(){
+  const c=companies[state.selected],qty=Math.max(0,+document.querySelector("#quantity").value||0);
+  document.querySelector("#terminal-symbol").textContent=`${c.ticker} ${money.format(c.price)}`;
+  if (state.orderType!=="market") {
+    const limit=+document.querySelector("#limit-price").value||c.price;
+    const reference=state.orderType==="stop"?+document.querySelector("#stop-price").value||c.price:limit;
+    document.querySelector("#estimate").textContent=money.format(qty*reference);
+    document.querySelector("#trade").textContent=`Place ${state.side} ${state.orderType} order`;
+    return;
+  }
+  const book=state.side==="buy"?c.book.asks:c.book.bids;let left=qty,total=0;
+  for(const o of book){const n=Math.min(left,o.quantity);total+=n*o.price;left-=n;if(!left)break;}
+  document.querySelector("#estimate").textContent=left?"Insufficient liquidity":money.format(total);
+  document.querySelector("#trade").textContent=`${state.side==="buy"?"Buy":"Sell"} ${qty||""} shares`;
+}
+
+companies.forEach(seedBook);
+document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelector("#next-week").onclick=()=>runDays(5); document.querySelector("#next-month").onclick=()=>runDays(20);
+document.querySelector("#show-advisor").onclick=()=>{state.advisorHidden=false;render();}; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
+document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
+document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
+document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});
+document.querySelector("#save-game").onclick=saveGame; document.querySelector("#load-game").onclick=loadGame; document.querySelector("#new-game").onclick=openLaunchModal; document.querySelector("#modal-button").onclick=()=>newGame(true);
+document.querySelector("#cloud-save").onclick=cloudSaveGame; document.querySelector("#cloud-load").onclick=cloudLoadGame;
+document.querySelector("#auth-sign-up").onclick=signUp; document.querySelector("#auth-sign-in").onclick=signIn; document.querySelector("#auth-sign-out").onclick=signOut;
+document.querySelector("#launch-start").onclick=()=>newGame(true);
+document.querySelector("#launch-load").onclick=()=>loadGame();
+document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
+document.querySelector("#tutorial-next").onclick=nextTutorialStep;
+document.querySelector("#tutorial-skip").onclick=finishTutorial;
+document.querySelector("#difficulty").onchange=()=>{if(state.day>1)message("Difficulty applies when you start a new game.",false);};
+document.querySelectorAll("[data-side]").forEach(button=>button.onclick=()=>{state.side=button.dataset.side;document.querySelectorAll("[data-side]").forEach(b=>b.classList.toggle("active",b===button));button.parentElement.classList.toggle("sell",state.side==="sell");updateEstimate();});
+document.querySelector("#order-type-select").onchange=event=>{
+  state.orderType=event.target.value;
+  const usesLimit=state.orderType==="limit"||state.orderType==="stop-limit",usesStop=state.orderType==="stop"||state.orderType==="stop-limit",company=companies[state.selected];
+  document.querySelector("#limit-price-label").classList.toggle("hidden",!usesLimit);
+  document.querySelector("#stop-price-label").classList.toggle("hidden",!usesStop);
+  if(usesLimit) document.querySelector("#limit-price").value=company.price.toFixed(2);
+  if(usesStop) document.querySelector("#stop-price").value=(company.price*(state.side==="buy"?1.03:.97)).toFixed(2);
+  updateEstimate();
+};
+document.querySelectorAll("[data-quick-size]").forEach(button=>button.onclick=()=>{
+  const company=companies[state.selected],fraction=+button.dataset.quickSize,held=Math.max(0,state.holdings[company.ticker]||0);
+  const maximum=state.side==="buy"?Math.floor(state.cash/company.price):(held||Math.floor(accountEquity()*1.25/company.price));
+  document.querySelector("#quantity").value=Math.max(1,Math.floor(maximum*fraction));updateEstimate();
+});
+document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
+[...document.querySelectorAll("[data-finance-action]")].forEach(button=>button.onclick=()=>corporateFinanceAction(button.dataset.financeAction));
+["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>refreshDecisionLabels());
+window.addEventListener("resize",()=>renderChart(companies[state.selected])); render();
+initCloud();

@@ -15,7 +15,7 @@
       <p class="header-subtitle">Corporate command network</p>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save</button><button id="load-game">Load</button><button id="new-game">New game</button><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save</button><button id="load-game">Load</button><button id="cloud-save">Cloud save</button><button id="cloud-load">Cloud load</button><button id="new-game">New game</button><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -217,6 +217,33 @@
     </section>
   </main>
 
+  <div id="launch-modal" class="modal launch-modal" role="dialog" aria-modal="true">
+    <div class="launch-card">
+      <div class="launch-art"><img src="assets/corporate-city.png" alt="Corporate city district"></div>
+      <div class="launch-copy">
+        <p class="eyebrow">WELCOME TO THE BOARDROOM</p>
+        <h2>Build Your Market Empire</h2>
+        <p>Trade the market, run Nova Devices, read the economy, and grow from basic cash trader into a deal-making financier.</p>
+        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
+        <div class="cloud-panel" aria-label="Cloud account">
+          <div><strong>Cloud account</strong><span id="cloud-status">Cloud saves use Supabase when configured.</span></div>
+          <label>Email<input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
+          <label>Password<input id="auth-password" type="password" autocomplete="current-password" placeholder="At least 6 characters"></label>
+          <div class="cloud-actions"><button id="auth-sign-up">Sign up</button><button id="auth-sign-in">Sign in</button><button id="auth-sign-out">Sign out</button></div>
+        </div>
+        <div class="launch-actions"><button id="launch-start" class="primary">Start new campaign</button><button id="launch-load">Load saved game</button><button id="launch-explore">Explore current board</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-live="polite">
+    <div class="tutorial-card">
+      <img src="assets/executive-advisor.png" alt="Executive advisor">
+      <div><p class="eyebrow" id="tutorial-kicker"></p><h2 id="tutorial-title"></h2><p id="tutorial-text"></p></div>
+      <div class="tutorial-actions"><button id="tutorial-skip">Skip tutorial</button><button id="tutorial-next" class="primary">Next</button></div>
+    </div>
+  </div>
+
   <div id="game-modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card"><p class="eyebrow" id="modal-kicker"></p><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-score" class="modal-score"></div><button id="modal-button" class="primary">Start a new game</button></div>
   </div>
@@ -226,6 +253,8 @@
     <div class="status-news"><strong>WIRE</strong><span id="status-headline">Market network online.</span></div>
     <div class="status-values"><span>Cash <b id="status-cash"></b></span><span>Profit <b id="status-profit"></b></span><span id="status-date"></span></div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
