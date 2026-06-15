@@ -219,12 +219,12 @@
 
   <div id="launch-modal" class="modal launch-modal" role="dialog" aria-modal="true">
     <div class="launch-card">
-      <div class="launch-art"><img src="assets/corporate-city.png" alt="Corporate city district"></div>
+      <div class="launch-art" role="img" aria-label="Animated corporate city command map"><div class="city-grid-art"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
       <div class="launch-copy">
         <p class="eyebrow">WELCOME TO THE BOARDROOM</p>
         <h2>Build Your Market Empire</h2>
         <p>Trade the market, run Nova Devices, read the economy, and grow from basic cash trader into a deal-making financier.</p>
-        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
+        <div class="launch-advisor"><div class="advisor-avatar" role="img" aria-label="Executive advisor portrait"></div><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
         <div class="cloud-panel" aria-label="Cloud account">
           <div><strong>Cloud account</strong><span id="cloud-status">Cloud saves use Supabase when configured.</span></div>
           <label>Email<input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
@@ -238,7 +238,7 @@
 
   <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-live="polite">
     <div class="tutorial-card">
-      <img src="assets/executive-advisor.png" alt="Executive advisor">
+      <div class="advisor-avatar" role="img" aria-label="Executive advisor portrait"></div>
       <div><p class="eyebrow" id="tutorial-kicker"></p><h2 id="tutorial-title"></h2><p id="tutorial-text"></p></div>
       <div class="tutorial-actions"><button id="tutorial-skip">Skip tutorial</button><button id="tutorial-next" class="primary">Next</button></div>
     </div>
@@ -251,7 +251,7 @@
   <footer>Market mechanics inspired by the MIT-licensed Bristol Stock Exchange by Dave Cliff. This is a fictional game, not financial advice.</footer>
   <div class="status-console">
     <div class="status-news"><strong>WIRE</strong><span id="status-headline">Market network online.</span></div>
-    <div class="status-values"><span>Cash <b id="status-cash"></b></span><span>Profit <b id="status-profit"></b></span><span id="status-date"></span></div>
+    <div class="status-values"><span>Cash <b id="status-cash"></b></span><span>Profit <b id="status-profit"></b></span><span id="status-date"></span><span>FPS <b id="status-fps">60</b></span><button id="audio-toggle" type="button" aria-pressed="false">Sound off</button></div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>

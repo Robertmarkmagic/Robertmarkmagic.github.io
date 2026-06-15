@@ -59,6 +59,9 @@ const initialState=JSON.parse(JSON.stringify(state));
 let orderId = 0;
 let supabaseClient = null;
 let currentUser = null;
+let audioContext = null;
+let audioEnabled = false;
+const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null };
 const progressionMilestones = [
   {id:"basic",name:"Cash Trader",description:"Market buy and sell orders",worth:0,day:1},
   {id:"limit",name:"Order Specialist",description:"Limit orders and patient execution",worth:105000,day:10},
@@ -125,6 +128,7 @@ function executeTrade() {
     addLedger(`Placed ${state.side} ${state.orderType} order for ${qty} ${company.ticker}`,0);
     const details=[order.stop?`stop ${money.format(order.stop)}`:"",order.limit?`limit ${money.format(order.limit)}`:""].filter(Boolean).join(", ");
     message(`${state.orderType} order placed at ${details}.`,true);
+    playCue("order");
     processOpenOrders(); render();
     return;
   }
@@ -152,6 +156,7 @@ function executeMarketTrade(company,side,qty,limit=null,renderAfter=true) {
   addLedger(`${side === "buy" ? "Bought" : current>=qty ? "Sold" : "Sold short"} ${qty} ${company.ticker} @ ${money.format(result.average)}`,side === "buy" ? -result.value : result.value);
   message(`${side === "buy" ? "Bought" : "Sold"} ${qty} ${company.ticker} at an average ${money.format(result.average)}.`,true);
   showExecutionToast(`${side === "buy" ? "BUY" : "SELL"} ${qty} ${company.ticker} filled at ${money.format(result.average)}`);
+  playCue(side === "buy" ? "buy" : "sell");
   seedBook(company);
   if(renderAfter) render();
   return {ok:true};
@@ -185,6 +190,37 @@ function showExecutionToast(text) {
   toast.classList.remove("hidden");
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200);
+}
+
+function ensureAudio() {
+  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioContext.state === "suspended") audioContext.resume();
+  return audioContext;
+}
+
+function playCue(type="click") {
+  if (!audioEnabled) return;
+  const ctx=ensureAudio(), now=ctx.currentTime, gain=ctx.createGain(), osc=ctx.createOscillator();
+  const tones={click:[520,.035],order:[660,.055],buy:[880,.08],sell:[360,.08],day:[520,.06],error:[140,.12],win:[740,.14]};
+  const [freq,length]=tones[type]||tones.click;
+  osc.type=type==="error"?"sawtooth":"square";
+  osc.frequency.setValueAtTime(freq,now);
+  if (type==="buy" || type==="win") osc.frequency.exponentialRampToValueAtTime(freq*1.5,now+length);
+  if (type==="sell" || type==="error") osc.frequency.exponentialRampToValueAtTime(Math.max(80,freq*.7),now+length);
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(.06,now+.01);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+length);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now); osc.stop(now+length+.02);
+}
+
+function toggleAudio() {
+  audioEnabled=!audioEnabled;
+  ensureAudio();
+  const button=document.querySelector("#audio-toggle");
+  button.textContent=audioEnabled?"Sound on":"Sound off";
+  button.setAttribute("aria-pressed",audioEnabled?"true":"false");
+  playCue("win");
 }
 
 const tutorialSteps=[
@@ -375,6 +411,7 @@ function runDays(days) {
   for (let i=0;i<days;i++) {
     if (!advanceDay(false)) break;
   }
+  playCue("day");
   render();
 }
 
@@ -556,6 +593,7 @@ function newGame(startTutorial=false) {
   state.difficulty=document.querySelector("#difficulty").value;
   const settings=difficultySettings(); companies[0].unitCost*=settings.costMultiplier; companies[0].products.forEach(p=>p.unitCost*=settings.costMultiplier); companies.forEach(c=>c.volatility*=settings.volatility);
   companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message("New campaign started. Your first task: review Nova Core and place a small trade.",true);
+  playCue("win");
   if (startTutorial) beginTutorial();
 }
 
@@ -853,6 +891,62 @@ function accountEquity(){ return state.cash+portfolioValue(); }
 function pct(value){ return `${value>=0?"+":""}${(value*100).toFixed(2)}%`; }
 function message(text,good){ const el=document.querySelector("#trade-message"); el.textContent=text; el.className=good?"up":"down"; }
 
+function selectCompany(index) {
+  state.selected=(index+companies.length)%companies.length;
+  const selected=companies[state.selected];
+  if(state.orderType==="limit"||state.orderType==="stop-limit") document.querySelector("#limit-price").value=selected.price.toFixed(2);
+  if(state.orderType==="stop"||state.orderType==="stop-limit") document.querySelector("#stop-price").value=(selected.price*(state.side==="buy"?1.03:.97)).toFixed(2);
+  render();
+}
+
+function handleKeyboard(event) {
+  const tag=event.target.tagName;
+  if (tag==="INPUT" || tag==="SELECT" || tag==="TEXTAREA") return;
+  const key=event.key.toLowerCase();
+  if (key==="arrowright" || key==="d") { event.preventDefault(); selectCompany(state.selected+1); playCue("click"); }
+  else if (key==="arrowleft" || key==="a") { event.preventDefault(); selectCompany(state.selected-1); playCue("click"); }
+  else if (key==="arrowup" || key==="w") { event.preventDefault(); const q=document.querySelector("#quantity"); q.value=Math.min(999999,(+q.value||0)+10); updateEstimate(); playCue("click"); }
+  else if (key==="arrowdown" || key==="s") { event.preventDefault(); const q=document.querySelector("#quantity"); q.value=Math.max(1,(+q.value||1)-10); updateEstimate(); playCue("click"); }
+  else if (key===" " && document.querySelector("#launch-modal").classList.contains("hidden")) { event.preventDefault(); executeTrade(); }
+  else if (key==="enter") { event.preventDefault(); runDays(1); }
+  else if (key==="m") { event.preventDefault(); toggleAudio(); }
+  else if (key==="escape") { finishTutorial(); document.querySelector("#game-modal").classList.add("hidden"); }
+}
+
+function setupTouchControls() {
+  const chart=document.querySelector("#chart");
+  chart.addEventListener("pointerdown",event=>{runtime.touchStart={x:event.clientX,y:event.clientY};});
+  chart.addEventListener("pointerup",event=>{
+    if (!runtime.touchStart) return;
+    const dx=event.clientX-runtime.touchStart.x, dy=event.clientY-runtime.touchStart.y;
+    runtime.touchStart=null;
+    if (Math.abs(dx)>45 && Math.abs(dx)>Math.abs(dy)) { selectCompany(state.selected+(dx<0?1:-1)); playCue("click"); }
+    else if (Math.abs(dy)>45) { runDays(dy<0?5:1); }
+  });
+}
+
+function updateFrame(delta) {
+  runtime.frames++;
+  runtime.fpsTime+=delta;
+  if (runtime.fpsTime>=500) {
+    runtime.fps=Math.round(runtime.frames*1000/runtime.fpsTime);
+    runtime.frames=0; runtime.fpsTime=0;
+  }
+}
+
+function renderFrame() {
+  const fps=document.querySelector("#status-fps");
+  if (fps) fps.textContent=String(Math.max(1,Math.min(99,runtime.fps)));
+}
+
+function gameLoop(timestamp) {
+  const delta=runtime.lastFrame?Math.min(100,timestamp-runtime.lastFrame):16.67;
+  runtime.lastFrame=timestamp;
+  updateFrame(delta);
+  renderFrame();
+  requestAnimationFrame(gameLoop);
+}
+
 function renderDashboard(worth,investments) {
   const hero=document.querySelector("#hero-net-worth"),previous=Number(hero.dataset.value||worth),dailyPnl=worth-(state.dayStartEquity||state.startWorth);
   hero.textContent=money.format(worth); hero.dataset.value=worth;
@@ -929,7 +1023,7 @@ function render() {
   document.querySelector("#cash").textContent=money.format(state.cash); document.querySelector("#investments").textContent=money.format(investments); document.querySelector("#net-worth").textContent=money.format(worth);
   const returnEl=document.querySelector("#return"); returnEl.textContent=pct(worth/state.startWorth-1); returnEl.className=worth>=state.startWorth?"up":"down";
   document.querySelector("#stock-list").innerHTML=companies.map((c,i)=>{const ch=(c.price-c.previous)/c.previous;return `<button class="stock ${i===state.selected?"active":""}" data-index="${i}"><span><strong>${c.ticker}</strong><small>${c.name}</small></span><span class="stock-price"><strong>${money.format(c.price)}</strong><small class="${ch>=0?"up":"down"}">${pct(ch)}</small></span></button>`}).join("");
-  document.querySelectorAll(".stock").forEach(el=>el.onclick=()=>{state.selected=+el.dataset.index;const selected=companies[state.selected];if(state.orderType==="limit"||state.orderType==="stop-limit")document.querySelector("#limit-price").value=selected.price.toFixed(2);if(state.orderType==="stop"||state.orderType==="stop-limit")document.querySelector("#stop-price").value=(selected.price*(state.side==="buy"?1.03:.97)).toFixed(2);message("",true);render();});
+  document.querySelectorAll(".stock").forEach(el=>el.onclick=()=>{selectCompany(+el.dataset.index); message("",true); playCue("click");});
   document.querySelector("#sector").textContent=company.sector;document.querySelector("#company-name").textContent=company.name;document.querySelector("#ticker").textContent=`NASDAQ: ${company.ticker}`;document.querySelector("#price").textContent=money.format(company.price);
   const changeEl=document.querySelector("#change");changeEl.textContent=pct(change);changeEl.className=change>=0?"up":"down";
   document.querySelector("#fundamentals").innerHTML=[["Revenue",`$${company.revenue}m`],["Net profit",`$${company.profit}m`],["Debt",`$${company.debt}m`],["Dividend yield",pct(company.dividendYield)]].map(x=>`<div><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join("");
@@ -1224,6 +1318,7 @@ function updateEstimate(){
 
 companies.forEach(seedBook);
 document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelector("#next-week").onclick=()=>runDays(5); document.querySelector("#next-month").onclick=()=>runDays(20);
+document.querySelector("#audio-toggle").onclick=toggleAudio;
 document.querySelector("#show-advisor").onclick=()=>{state.advisorHidden=false;render();}; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
 document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
@@ -1255,5 +1350,8 @@ document.querySelectorAll("[data-quick-size]").forEach(button=>button.onclick=()
 document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
 [...document.querySelectorAll("[data-finance-action]")].forEach(button=>button.onclick=()=>corporateFinanceAction(button.dataset.financeAction));
 ["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>refreshDecisionLabels());
+window.addEventListener("keydown",handleKeyboard);
+setupTouchControls();
 window.addEventListener("resize",()=>renderChart(companies[state.selected])); render();
 initCloud();
+requestAnimationFrame(gameLoop);
