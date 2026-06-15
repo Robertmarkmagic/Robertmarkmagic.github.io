@@ -101,14 +101,17 @@
       </section>
 
       <aside class="trade-panel panel">
-        <h2>Place order</h2>
+        <div class="terminal-heading"><div><p class="eyebrow">TRADING TERMINAL</p><h2>Place order</h2></div><span id="terminal-symbol"></span></div>
         <div class="side-toggle"><button class="active" data-side="buy">Buy</button><button data-side="sell">Sell / Short</button></div>
-        <div class="order-type"><button class="active" data-order-type="market">Market</button><button data-order-type="limit">Limit</button></div>
+        <label>Order type<select id="order-type-select"><option value="market">Market</option><option value="limit">Limit</option><option value="stop">Stop</option><option value="stop-limit">Stop-limit</option></select></label>
         <label>Shares<input id="quantity" type="number" min="1" value="10"></label>
+        <div class="quick-size"><button data-quick-size=".25">25%</button><button data-quick-size=".5">50%</button><button data-quick-size=".75">75%</button><button data-quick-size="1">Max</button></div>
         <label id="limit-price-label" class="hidden">Limit price<input id="limit-price" type="number" min="0.01" step="0.01"></label>
+        <label id="stop-price-label" class="hidden">Stop trigger<input id="stop-price" type="number" min="0.01" step="0.01"></label>
         <div class="estimate"><span>Estimated value</span><strong id="estimate"></strong></div>
         <button id="trade" class="primary">Buy shares</button>
         <p id="trade-message" role="status"></p>
+        <div id="execution-toast" class="execution-toast hidden"><i></i><span></span></div>
         <hr>
         <h3>Your position</h3>
         <div id="position" class="position"></div>
