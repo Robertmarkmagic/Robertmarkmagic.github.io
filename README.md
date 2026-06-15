@@ -51,6 +51,8 @@ The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js
 - Option values respond to share price, volatility, interest rates, and time remaining.
 - Compete with four visible AI funds using value, momentum, macro, and short-selling strategies.
 - Follow institutional portfolios, performance, cash, positions, and large trades as their orders move prices.
+- Watch company news cascade through supplier, logistics, innovation, energy-cost, and capital-rotation links.
+- Track secondary stock moves and changes to confidence, growth, inflation, and interest-rate expectations in the market ripple monitor.
 
 ## Foundation
 
