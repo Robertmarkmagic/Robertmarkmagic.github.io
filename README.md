@@ -53,6 +53,7 @@ The site is ready for GitHub Pages. Publish `index.html`, `styles.css`, `game.js
 - Follow institutional portfolios, performance, cash, positions, and large trades as their orders move prices.
 - Watch company news cascade through supplier, logistics, innovation, energy-cost, and capital-rotation links.
 - Track secondary stock moves and changes to confidence, growth, inflation, and interest-rate expectations in the market ripple monitor.
+- Progress from cash trading into limit orders, margin shorts, options, and M&A through account-growth or experience milestones.
 
 ## Foundation
 
