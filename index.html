@@ -6,18 +6,30 @@
   <title>Market Foundry</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
   <header>
     <div>
       <p class="eyebrow">BUSINESS & MARKET SIMULATOR</p>
       <h1>Market Foundry</h1>
+      <p class="header-subtitle">Corporate command network</p>
     </div>
+    <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save</button><button id="load-game">Load</button><button id="new-game">New game</button><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
   </header>
 
+  <nav class="command-rail" aria-label="Command center navigation">
+    <a href="#dashboard" title="Portfolio HQ"><b>HQ</b><span>Dashboard</span></a>
+    <a href="#market" title="Market overview"><b>MK</b><span>Market</span></a>
+    <a href="#trading" title="Trading terminal"><b>TR</b><span>Trading</span></a>
+    <a href="#portfolio-section" title="Portfolio and news"><b>PF</b><span>Portfolio</span></a>
+    <a href="#operations" title="Company operations"><b>OP</b><span>Operations</span></a>
+    <a href="#finance" title="Corporate finance"><b>FN</b><span>Finance</span></a>
+    <a href="#deals" title="Mergers and acquisitions"><b>DL</b><span>Deals</span></a>
+  </nav>
+
   <main>
-    <section class="dashboard panel">
+    <section id="dashboard" class="dashboard panel">
       <div class="dashboard-hero">
         <p class="eyebrow">PORTFOLIO HQ</p>
         <span>Total portfolio value</span>
@@ -43,7 +55,7 @@
       <article><span>Open orders</span><strong id="orders-count"></strong></article>
     </section>
 
-    <section class="market-overview panel">
+    <section id="market" class="market-overview panel">
       <div class="panel-title"><div><h2>Market Heatmap</h2><span>Size reflects market value; color reflects today's move</span></div><strong id="market-breadth"></strong></div>
       <div id="market-heatmap" class="market-heatmap"></div>
     </section>
@@ -69,7 +81,7 @@
       <div class="advisor-actions"><span id="advisor-progress"></span><button id="advisor-dismiss">Dismiss</button><button id="advisor-next" class="primary">Next tip</button></div>
     </section>
 
-    <section class="workspace">
+    <section id="trading" class="workspace">
       <aside class="market-panel panel">
         <div class="panel-title"><h2>Market</h2><span>5 listed firms</span></div>
         <div id="stock-list" class="stock-list"></div>
@@ -103,7 +115,7 @@
       </aside>
     </section>
 
-    <section class="lower-grid">
+    <section id="portfolio-section" class="lower-grid">
       <article class="panel"><div class="panel-title"><h2>Portfolio</h2><span>Mark-to-market</span></div><div id="portfolio"></div></article>
       <article class="panel"><div class="panel-title"><h2>Market news</h2><span>Latest events</span></div><div id="news" class="news"></div></article>
     </section>
@@ -146,7 +158,7 @@
       </div>
     </section>
 
-    <section class="operations panel">
+    <section id="operations" class="operations panel">
       <div class="panel-title">
         <div><h2>Run Nova Devices</h2><span id="active-product-name">You are CEO and controlling shareholder</span></div>
         <strong id="operations-status">Decisions ready</strong>
@@ -172,7 +184,7 @@
       </div>
     </section>
 
-    <section class="corporate-finance panel">
+    <section id="finance" class="corporate-finance panel">
       <div class="panel-title">
         <div><h2>Corporate Finance</h2><span>Fund Nova Devices and protect control</span></div>
         <strong id="control-status"></strong>
@@ -193,7 +205,7 @@
       </div>
     </section>
 
-    <section class="takeovers panel">
+    <section id="deals" class="takeovers panel">
       <div class="panel-title">
         <div><h2>Mergers & Acquisitions</h2><span>Build strategic stakes in rival companies</span></div>
         <strong id="takeover-status"></strong>
@@ -207,6 +219,10 @@
   </div>
 
   <footer>Market mechanics inspired by the MIT-licensed Bristol Stock Exchange by Dave Cliff. This is a fictional game, not financial advice.</footer>
+  <div class="status-console">
+    <div class="status-news"><strong>WIRE</strong><span id="status-headline">Market network online.</span></div>
+    <div class="status-values"><span>Cash <b id="status-cash"></b></span><span>Profit <b id="status-profit"></b></span><span id="status-date"></span></div>
+  </div>
   <script src="game.js"></script>
 </body>
 </html>
