@@ -6,7 +6,12 @@ const companies = [
   { ticker:"GRNW", name:"Greenway Energy", sector:"Renewable Energy", price:31.60, revenue:510, profit:39, debt:240, growth:.18, volatility:.045, dividendYield:.008, cycleSensitivity:.9, inflationSensitivity:.45 },
   { ticker:"HARB", name:"Harbor Foods", sector:"Consumer Staples", price:62.10, revenue:1120, profit:96, debt:120, growth:.05, volatility:.018, dividendYield:.032, cycleSensitivity:.3, inflationSensitivity:.8 },
   { ticker:"AXIS", name:"Axis Logistics", sector:"Transportation", price:25.80, revenue:680, profit:42, debt:310, growth:.08, volatility:.03, dividendYield:.021, cycleSensitivity:1.05, inflationSensitivity:1.2 },
-  { ticker:"MEDI", name:"Mediora Labs", sector:"Healthcare", price:79.40, revenue:390, profit:51, debt:85, growth:.22, volatility:.055, dividendYield:0, cycleSensitivity:.4, inflationSensitivity:.35 }
+  { ticker:"MEDI", name:"Mediora Labs", sector:"Healthcare", price:79.40, revenue:390, profit:51, debt:85, growth:.22, volatility:.055, dividendYield:0, cycleSensitivity:.4, inflationSensitivity:.35 },
+  { ticker:"BRIK", name:"Brickwell Materials", sector:"Building Materials", price:18.70, revenue:460, profit:31, debt:180, growth:.06, volatility:.026, dividendYield:.018, cycleSensitivity:1.15, inflationSensitivity:1.05 },
+  { ticker:"FASH", name:"Urban Loom", sector:"Apparel Retail", price:37.25, revenue:740, profit:45, debt:95, growth:.11, volatility:.038, dividendYield:.01, cycleSensitivity:.95, inflationSensitivity:.75 },
+  { ticker:"FOAM", name:"Foam & Furnish", sector:"Home Goods", price:44.80, revenue:610, profit:48, debt:135, growth:.09, volatility:.032, dividendYield:.014, cycleSensitivity:1.1, inflationSensitivity:.9 },
+  { ticker:"BYTE", name:"ByteMart Online", sector:"E-Commerce", price:91.40, revenue:980, profit:68, debt:260, growth:.19, volatility:.052, dividendYield:0, cycleSensitivity:1.25, inflationSensitivity:.5 },
+  { ticker:"AGRI", name:"AgriNorth Foods", sector:"Agriculture", price:28.90, revenue:530, profit:37, debt:115, growth:.045, volatility:.024, dividendYield:.026, cycleSensitivity:.45, inflationSensitivity:1.1 }
 ].map((c,index) => ({...c, previous:c.price, history:Array.from({length:30},(_,i)=>c.price*(.92+i*.003+Math.random()*.06)), book:{bids:[],asks:[]}, totalShares:index===0?undefined:1000000, novaStake:0, takeoverDefense:0, controlled:false, quarterlyRevenue:0, quarterlyProfit:0, reports:[], analystRevenue:c.revenue/4*(.97+Math.random()*.06), analystProfit:c.profit/4*(.94+Math.random()*.12)}));
 
 Object.assign(companies[0], {
@@ -23,7 +28,7 @@ Object.assign(companies[0], {
   dailyRevenue:0,
   marketShare:.18,
   totalShares:1000000,
-  founderShares:560000,
+  founderShares:750000,
   bondDebt:0,
   bondRate:.06,
   dailyInterest:0,
@@ -51,7 +56,10 @@ const state = {
   difficulty:"normal", gameOver:false, takeoverNotice:"No active takeover campaign", selectedProduct:0,
   advisorStep:0, advisorHidden:false, optionType:"call", optionPositions:[],
   aiFunds:createAiFunds(), institutionActivity:[], marketRipples:[], unlockedMilestones:["basic"],
-  equityHistory:[100000], dayStartEquity:100000
+  equityHistory:[100000], dayStartEquity:100000,
+  player:{name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"},
+  facilities:[],
+  autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
 const initialCompanies=JSON.parse(JSON.stringify(companies));
@@ -62,6 +70,17 @@ let currentUser = null;
 let audioContext = null;
 let audioEnabled = false;
 const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null };
+const facilityBlueprints = {
+  factory:{name:"Factory",cost:12,capacity:140,role:"Produces finished goods"},
+  store:{name:"Retail Store",cost:7,capacity:90,role:"Sells finished goods to consumers"},
+  industry:{name:"Raw-material Industry",cost:10,capacity:120,role:"Produces raw materials"}
+};
+const productLines = {
+  bricks:{name:"Bricks",raw:"clay",input:"Clay",output:"Bricks",unitCost:14,unitPrice:38,market:110},
+  bread:{name:"Bread",raw:"grain",input:"Grain",output:"Bread",unitCost:6,unitPrice:15,market:180},
+  shirts:{name:"Shirts",raw:"fabric",input:"Fabric",output:"Shirts",unitCost:11,unitPrice:32,market:130},
+  phones:{name:"Phones",raw:"components",input:"Components",output:"Phones",unitCost:120,unitPrice:310,market:55}
+};
 const progressionMilestones = [
   {id:"basic",name:"Cash Trader",description:"Market buy and sell orders",worth:0,day:1},
   {id:"limit",name:"Order Specialist",description:"Limit orders and patient execution",worth:105000,day:10},
@@ -144,9 +163,21 @@ function executeMarketTrade(company,side,qty,limit=null,renderAfter=true) {
     const amount=Math.min(qty-possible,order.quantity); possible+=amount; value+=amount*order.price;
     if(possible===qty) break;
   }
-  if (possible<qty) return {ok:false,reason:"The order cannot be fully filled at this price."};
-  if (side === "buy" && value>state.cash) return {ok:false,reason:"Not enough cash for this order."};
+  if (possible<=0) return {ok:false,reason:"No market liquidity is available for this order."};
+  if (side === "buy" && value>state.cash) {
+    possible=0; value=0;
+    for (const order of book) {
+      if (limit!==null && order.price>limit) break;
+      const affordable=Math.floor((state.cash-value)/order.price);
+      const amount=Math.min(qty-possible,order.quantity,affordable);
+      if (amount<=0) break;
+      possible+=amount; value+=amount*order.price;
+      if(possible===qty) break;
+    }
+    if (possible<=0) return {ok:false,reason:"Not enough cash for this order."};
+  }
   const current=state.holdings[company.ticker]||0;
+  if (possible<qty) qty=possible;
   const projected=side === "buy" ? current+qty : current-qty;
   if (projected<0 && !featureUnlocked("short")) return {ok:false,reason:"Short selling unlocks at $112,500 net worth or day 25."};
   if (projected<0 && shortExposureAfter(company,projected)>accountEquity()*1.25) return {ok:false,reason:"Short position exceeds your margin limit."};
@@ -255,6 +286,13 @@ function nextTutorialStep() {
   tutorialIndex++; renderTutorial();
 }
 
+function ensureStateDefaults() {
+  if (!state.player) state.player={name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"};
+  if (!Array.isArray(state.facilities)) state.facilities=[];
+  if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
+  if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
+}
+
 function openLaunchModal() {
   document.querySelector("#launch-modal").classList.remove("hidden");
   document.querySelector("#launch-load").disabled=!localStorage.getItem(SAVE_KEY);
@@ -301,6 +339,7 @@ function advanceDay(renderAfter=true) {
   state.day++;
   updateEconomy();
   updateTakeoverMarket();
+  runFacilities();
   runPlayerCompany(companies[0]);
   companies.forEach(c => {
     c.previous=c.price;
@@ -415,6 +454,102 @@ function runDays(days) {
   render();
 }
 
+function facilityLabel(facility) {
+  return `${facilityBlueprints[facility.type].name} - ${productLines[facility.line].name}`;
+}
+
+function empireMessage(text,good) {
+  const el=document.querySelector("#empire-status");
+  if (el) { el.textContent=text; el.className=good?"up":"down"; }
+  message(text,good);
+}
+
+function buildFacility() {
+  const type=document.querySelector("#facility-type").value, line=document.querySelector("#facility-line").value;
+  const blueprint=facilityBlueprints[type], company=companies[0], cost=blueprint.cost;
+  if (!hasControl()) return empireMessage("You need board control to build facilities.",false);
+  if (company.companyCash<cost) return empireMessage(`Nova needs $${cost}m cash to build this ${blueprint.name}.`,false);
+  const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:type==="industry"?0:60,finishedInventory:type==="store"?40:0,marketing:35,profit:0,lastUnits:0};
+  state.facilities.push(facility);
+  company.companyCash-=cost;
+  state.news.unshift({day:state.day,ticker:"NOVA",impact:.02,text:`${state.player.companyName} opened a ${facilityLabel(facility)}.`});
+  state.news=state.news.slice(0,6);
+  addLedger(`Built ${facilityLabel(facility)}`,-cost*1000000);
+  empireMessage(`${facilityLabel(facility)} opened. It will operate when time advances.`,true);
+  playCue("win");
+  render();
+}
+
+function upgradeFacility(id) {
+  const facility=state.facilities.find(item=>item.id===id), company=companies[0];
+  if (!facility) return;
+  const cost=4+facility.level*3;
+  if (company.companyCash<cost) return empireMessage(`Need $${cost}m company cash for this upgrade.`,false);
+  company.companyCash-=cost; facility.level++;
+  addLedger(`Upgraded ${facilityLabel(facility)}`,-cost*1000000);
+  empireMessage(`${facilityLabel(facility)} upgraded to level ${facility.level}.`,true);
+  render();
+}
+
+function marketFacility(id) {
+  const facility=state.facilities.find(item=>item.id===id), company=companies[0];
+  if (!facility) return;
+  if (company.companyCash<1) return empireMessage("Need $1m company cash for a marketing push.",false);
+  company.companyCash-=1; facility.marketing+=20;
+  addLedger(`Marketing push: ${facilityLabel(facility)}`,-1000000);
+  empireMessage(`${facilityLabel(facility)} marketing increased.`,true);
+  render();
+}
+
+function runFacilities() {
+  if (!Array.isArray(state.facilities) || !state.facilities.length) return;
+  const company=companies[0], rawPool={}, finishedPool={};
+  let profit=0, units=0, revenue=0;
+  state.facilities.forEach(facility=>{
+    const blueprint=facilityBlueprints[facility.type], line=productLines[facility.line], capacity=blueprint.capacity*facility.level;
+    facility.profit=0; facility.lastUnits=0;
+    if (facility.type==="industry") {
+      const made=Math.round(capacity*(.85+Math.random()*.3));
+      rawPool[line.raw]=(rawPool[line.raw]||0)+made;
+      facility.rawInventory+=made; facility.lastUnits=made;
+      const cost=made*line.unitCost*.35/1000000;
+      company.companyCash-=cost; profit-=cost;
+    }
+  });
+  state.facilities.forEach(facility=>{
+    const line=productLines[facility.line], capacity=facilityBlueprints[facility.type].capacity*facility.level;
+    if (facility.type==="factory") {
+      const availableRaw=(rawPool[line.raw]||0)+facility.rawInventory;
+      const rawUsed=Math.min(capacity,availableRaw);
+      const external=Math.max(0,capacity-rawUsed);
+      rawPool[line.raw]=Math.max(0,(rawPool[line.raw]||0)-rawUsed);
+      facility.rawInventory=Math.max(0,facility.rawInventory-Math.max(0,rawUsed-(rawPool[line.raw]||0)));
+      const made=Math.round((rawUsed+external)*(.82+Math.random()*.12));
+      finishedPool[facility.line]=(finishedPool[facility.line]||0)+made;
+      facility.finishedInventory+=made; facility.lastUnits=made;
+      const cost=(made*line.unitCost+external*line.unitCost*.8)/1000000;
+      company.companyCash-=cost; profit-=cost;
+    }
+  });
+  state.facilities.forEach(facility=>{
+    const line=productLines[facility.line], capacity=facilityBlueprints[facility.type].capacity*facility.level;
+    if (facility.type==="store") {
+      const supply=(finishedPool[facility.line]||0)+facility.finishedInventory;
+      const demand=Math.round(line.market*(1+Math.sqrt(facility.marketing/50)*.18)*(state.economy.confidence/100)*(.85+Math.random()*.3));
+      const sold=Math.min(supply,capacity,demand);
+      facility.finishedInventory=Math.max(0,supply-sold);
+      finishedPool[facility.line]=0;
+      const sales=sold*line.unitPrice/1000000, marketing=facility.marketing/1000;
+      company.companyCash+=sales-marketing; profit+=sales-marketing; revenue+=sales; units+=sold;
+      facility.profit=sales-marketing; facility.lastUnits=sold;
+    }
+  });
+  company.dailyOperatingProfit+=profit;
+  company.dailyRevenue+=revenue;
+  company.marketShare=Math.min(.68,company.marketShare+units/500000);
+  if (profit!==0 && state.day%5===0) addLedger("Empire operations",profit*1000000);
+}
+
 function updateTakeoverMarket() {
   companies.slice(1).forEach(target=>{
     if (target.controlled) return;
@@ -476,10 +611,11 @@ function applySavePayload(payload, label="Saved game loaded.") {
   if (!Array.isArray(state.aiFunds)) state.aiFunds=createAiFunds();
   if (!Array.isArray(state.institutionActivity)) state.institutionActivity=[];
   if (!Array.isArray(state.marketRipples)) state.marketRipples=[];
-  if (!Array.isArray(state.unlockedMilestones)) state.unlockedMilestones=["basic"];
-  if (!Array.isArray(state.equityHistory)) state.equityHistory=[accountEquity()];
-  if (!Number.isFinite(state.dayStartEquity)) state.dayStartEquity=accountEquity();
-  companies.forEach(c=>{if(!c.book)c.book={bids:[],asks:[]};seedBook(c);});
+    if (!Array.isArray(state.unlockedMilestones)) state.unlockedMilestones=["basic"];
+    if (!Array.isArray(state.equityHistory)) state.equityHistory=[accountEquity()];
+    if (!Number.isFinite(state.dayStartEquity)) state.dayStartEquity=accountEquity();
+    ensureStateDefaults();
+    companies.forEach(c=>{if(!c.book)c.book={bids:[],asks:[]};seedBook(c);});
   document.querySelector("#difficulty").value=state.difficulty;
   document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); message(label,true); render(); return true;
 }
@@ -613,6 +749,14 @@ async function cloudLoadGame() {
 
 function newGame(startTutorial=false) {
   restoreArray(companies,initialCompanies); restoreObject(state,initialState); orderId=0;
+  state.player={
+    name:(document.querySelector("#founder-name")?.value||"Founder").trim()||"Founder",
+    companyName:(document.querySelector("#founder-company")?.value||"Nova Devices").trim()||"Nova Devices",
+    avatar:document.querySelector("#avatar-choices .active")?.dataset.avatar||"founder-a",
+    logo:document.querySelector("#logo-choices .active")?.dataset.logo||"logo-a"
+  };
+  companies[0].name=state.player.companyName;
+  companies[0].founderShares=750000;
   state.difficulty=document.querySelector("#difficulty").value;
   const settings=difficultySettings(); companies[0].unitCost*=settings.costMultiplier; companies[0].products.forEach(p=>p.unitCost*=settings.costMultiplier); companies.forEach(c=>c.volatility*=settings.volatility);
   companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message("New campaign started. Your first task: review Nova Core and place a small trade.",true);
@@ -966,8 +1110,24 @@ function gameLoop(timestamp) {
   const delta=runtime.lastFrame?Math.min(100,timestamp-runtime.lastFrame):16.67;
   runtime.lastFrame=timestamp;
   updateFrame(delta);
+  if (state.autoTime?.running && !state.gameOver && document.querySelector("#launch-modal").classList.contains("hidden")) {
+    state.autoTime.accumulator+=delta;
+    const interval=Math.max(120,1400/(state.autoTime.speed||1));
+    if (state.autoTime.accumulator>=interval) {
+      state.autoTime.accumulator=0;
+      advanceDay(true);
+    }
+  }
   renderFrame();
   requestAnimationFrame(gameLoop);
+}
+
+function toggleTime() {
+  ensureStateDefaults();
+  state.autoTime.running=!state.autoTime.running;
+  state.autoTime.accumulator=0;
+  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
+  playCue(state.autoTime.running?"day":"click");
 }
 
 function renderDashboard(worth,investments) {
@@ -1040,9 +1200,13 @@ function renderChart(company) {
 }
 
 function render() {
+  ensureStateDefaults();
   checkProgression();
   const company=companies[state.selected], investments=portfolioValue(), worth=state.cash+investments, change=(company.price-company.previous)/company.previous;
   document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/240)+1}, Q${Math.floor(((state.day-1)%240)/60)+1}, Day ${state.day}`;
+  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
+  document.querySelector("#time-speed").value=String(state.autoTime.speed||1);
+  companies[0].name=state.player.companyName||companies[0].name;
   document.querySelector("#cash").textContent=money.format(state.cash); document.querySelector("#investments").textContent=money.format(investments); document.querySelector("#net-worth").textContent=money.format(worth);
   const returnEl=document.querySelector("#return"); returnEl.textContent=pct(worth/state.startWorth-1); returnEl.className=worth>=state.startWorth?"up":"down";
   document.querySelector("#stock-list").innerHTML=companies.map((c,i)=>{const ch=(c.price-c.previous)/c.previous;return `<button class="stock ${i===state.selected?"active":""}" data-index="${i}"><span><strong>${c.ticker}</strong><small>${c.name}</small></span><span class="stock-price"><strong>${money.format(c.price)}</strong><small class="${ch>=0?"up":"down"}">${pct(ch)}</small></span></button>`}).join("");
@@ -1060,7 +1224,7 @@ function render() {
     ? `<div class="portfolio-row"><span>Company</span><span>Position</span><span>Value</span><span>P/L</span></div>`+ownedCompanies.map(c=>{const h=state.holdings[c.ticker],pl=(c.price-state.averageCost[c.ticker])*h;return `<div class="portfolio-row"><span><strong>${c.ticker}</strong> ${c.name}</span><span>${h>0?`${h} long`:`${Math.abs(h)} short`}</span><span>${money.format(h*c.price)}</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span></div>`}).join("")
     : `<p style="padding:20px;color:var(--muted)">Your portfolio is empty. Choose a company and place your first order.</p>`;
   document.querySelector("#news").innerHTML=state.news.length?state.news.map(n=>`<div class="news-item"><time>DAY ${n.day} &middot; ${n.ticker}</time><p>${n.text} <strong class="${n.impact>=0?"up":"down"}">${pct(n.impact)}</strong></p></div>`).join(""):`<p style="padding:20px 4px;color:var(--muted)">No major news yet. Run the next day to move the market.</p>`;
-  renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFinance(); renderTakeovers(); updateEstimate(); renderChart(company);
+  renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFacilities(); renderFinance(); renderTakeovers(); updateEstimate(); renderChart(company);
 }
 
 function renderProgression() {
@@ -1271,6 +1435,33 @@ function renderProducts() {
   document.querySelectorAll("[data-launch-product]").forEach(button=>button.onclick=()=>launchProduct(+button.dataset.launchProduct));
 }
 
+function renderFacilities() {
+  ensureStateDefaults();
+  const list=document.querySelector("#facility-list");
+  if (!list) return;
+  const company=companies[0];
+  document.querySelector("#empire-status").textContent=state.facilities.length?`${state.facilities.length} facilities operating`:"Build your first factory, store, or industry";
+  list.innerHTML=state.facilities.length?state.facilities.map(facility=>{
+    const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type];
+    const kpis=[
+      ["Level",facility.level],
+      ["Last units",facility.lastUnits.toLocaleString()],
+      ["Marketing",`$${facility.marketing}k/day`],
+      ["Last profit",`$${facility.profit.toFixed(3)}m`]
+    ].map(item=>`<span>${item[0]}<strong>${item[1]}</strong></span>`).join("");
+    const stock=facility.type==="industry"?`${facility.rawInventory.toLocaleString()} ${line.input}`:`${facility.finishedInventory.toLocaleString()} ${line.output}`;
+    return `<article class="facility-card"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Price<strong>${money.format(line.unitPrice)}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
+  }).join(""):`<div class="builder-card"><h3>No facilities yet</h3><p>Start small: build an industry for raw materials, a factory to make goods, and a store to sell them.</p></div>`;
+  document.querySelectorAll("[data-upgrade-facility]").forEach(button=>button.onclick=()=>upgradeFacility(+button.dataset.upgradeFacility));
+  document.querySelectorAll("[data-market-facility]").forEach(button=>button.onclick=()=>marketFacility(+button.dataset.marketFacility));
+  const supply=document.querySelector("#supply-chain");
+  supply.innerHTML=Object.entries(productLines).map(([key,line])=>{
+    const count=state.facilities.filter(f=>f.line===key).length;
+    return `<div class="supply-card"><strong>${line.name}</strong><p>${line.input} -> ${line.output}. ${count} owned facility${count===1?"":"ies"}.</p></div>`;
+  }).join("");
+  document.querySelector("#build-facility").disabled=!hasControl() || company.companyCash<Math.min(...Object.values(facilityBlueprints).map(x=>x.cost));
+}
+
 function renderFinance() {
   const c=companies[0], ownership=votingOwnership(), controlled=hasControl();
   const publicShares=c.totalShares-c.founderShares;
@@ -1342,6 +1533,8 @@ function updateEstimate(){
 companies.forEach(seedBook);
 document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelector("#next-week").onclick=()=>runDays(5); document.querySelector("#next-month").onclick=()=>runDays(20);
 document.querySelector("#audio-toggle").onclick=toggleAudio;
+document.querySelector("#time-toggle").onclick=toggleTime;
+document.querySelector("#time-speed").onchange=event=>{ensureStateDefaults();state.autoTime.speed=+event.target.value||1;state.autoTime.accumulator=0;};
 document.querySelector("#show-advisor").onclick=()=>{state.advisorHidden=false;render();}; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
 document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
@@ -1355,6 +1548,9 @@ document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#
 document.querySelector("#tutorial-next").onclick=nextTutorialStep;
 document.querySelector("#tutorial-skip").onclick=finishTutorial;
 document.querySelector("#difficulty").onchange=()=>{if(state.day>1)message("Difficulty applies when you start a new game.",false);};
+document.querySelector("#build-facility").onclick=buildFacility;
+document.querySelectorAll("[data-avatar]").forEach(button=>button.onclick=()=>{document.querySelectorAll("[data-avatar]").forEach(item=>item.classList.toggle("active",item===button));playCue("click");});
+document.querySelectorAll("[data-logo]").forEach(button=>button.onclick=()=>{document.querySelectorAll("[data-logo]").forEach(item=>item.classList.toggle("active",item===button));playCue("click");});
 document.querySelectorAll("[data-side]").forEach(button=>button.onclick=()=>{state.side=button.dataset.side;document.querySelectorAll("[data-side]").forEach(b=>b.classList.toggle("active",b===button));button.parentElement.classList.toggle("sell",state.side==="sell");updateEstimate();});
 document.querySelector("#order-type-select").onchange=event=>{
   state.orderType=event.target.value;
