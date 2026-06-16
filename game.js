@@ -1037,13 +1037,23 @@ function financeMessage(text,good) {
 
 function applyManagementDecisions() {
   if (!hasControl()) return financeMessage("You need majority voting control to set company strategy.",false);
-  const company=companies[0];
-  company.pendingDecisions={
-    productIndex:state.selectedProduct,
-    product:{price:+document.querySelector("#product-price").value,production:+document.querySelector("#production").value,marketing:+document.querySelector("#marketing").value},
-    research:+document.querySelector("#research").value
+  const company=companies[0], product=company.products[state.selectedProduct] || company.products.find(item=>item.active);
+  if (!product) return financeMessage("No active product is available to manage.",false);
+  const decisions={
+    price:+document.querySelector("#product-price").value,
+    production:+document.querySelector("#production").value,
+    marketing:+document.querySelector("#marketing").value
   };
-  document.querySelector("#operations-status").textContent="Scheduled for next day";
+  Object.assign(product,decisions);
+  company.research=+document.querySelector("#research").value;
+  company.pendingDecisions=null;
+  document.querySelector("#operations-status").textContent="Decisions applied";
+  document.querySelector("#management-advice").textContent="Management decisions are active now. Advance time to see the sales and profit impact.";
+  document.querySelector("#status-headline").textContent=`${product.name} strategy updated: price ${money.format(product.price)}, production ${product.production.toLocaleString()} units.`;
+  addLedger(`Updated ${product.name} strategy`,0);
+  message("Management decisions applied. Advance time to see the new results.",true);
+  playCue("order");
+  render();
 }
 
 function launchProduct(index) {
