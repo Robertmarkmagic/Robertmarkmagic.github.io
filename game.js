@@ -77,13 +77,42 @@ const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null };
 const facilityBlueprints = {
   factory:{name:"Factory",cost:12,capacity:140,role:"Produces finished goods"},
   store:{name:"Retail Store",cost:7,capacity:90,role:"Sells finished goods to consumers"},
-  industry:{name:"Raw-material Industry",cost:10,capacity:120,role:"Produces raw materials"}
+  industry:{name:"Raw-material Industry",cost:10,capacity:120,role:"Produces raw materials"},
+  gasStation:{name:"Gas Station",cost:8,capacity:115,role:"Sells fuel, snacks, and travel essentials"},
+  bakery:{name:"Bakery",cost:6,capacity:105,role:"Sells fresh baked goods"},
+  pharmacy:{name:"Pharmacy",cost:9,capacity:95,role:"Sells medicine and personal-care products"},
+  electronicsShop:{name:"Electronics Shop",cost:10,capacity:75,role:"Sells consumer electronics"},
+  fashionShop:{name:"Fashion Shop",cost:8,capacity:90,role:"Sells apparel and accessories"},
+  groceryShop:{name:"Grocery Shop",cost:9,capacity:130,role:"Sells everyday food and drinks"},
+  homeShop:{name:"Home Goods Shop",cost:8,capacity:85,role:"Sells household products"},
+  petShop:{name:"Pet Shop",cost:6,capacity:80,role:"Sells pet supplies"},
+  jewelryShop:{name:"Jewelry Shop",cost:11,capacity:45,role:"Sells high-margin luxury goods"},
+  bookShop:{name:"Book Shop",cost:5,capacity:70,role:"Sells books and media"},
+  carWash:{name:"Car Wash",cost:5,capacity:100,role:"Provides consumer services"}
 };
 const productLines = {
   bricks:{name:"Bricks",raw:"clay",input:"Clay",output:"Bricks",unitCost:14,unitPrice:38,market:110},
   bread:{name:"Bread",raw:"grain",input:"Grain",output:"Bread",unitCost:6,unitPrice:15,market:180},
   shirts:{name:"Shirts",raw:"fabric",input:"Fabric",output:"Shirts",unitCost:11,unitPrice:32,market:130},
-  phones:{name:"Phones",raw:"components",input:"Components",output:"Phones",unitCost:120,unitPrice:310,market:55}
+  phones:{name:"Phones",raw:"components",input:"Components",output:"Phones",unitCost:120,unitPrice:310,market:55},
+  fuel:{name:"Fuel",raw:"oil",input:"Crude oil",output:"Fuel",unitCost:42,unitPrice:92,market:170},
+  coffee:{name:"Coffee",raw:"beans",input:"Coffee beans",output:"Coffee",unitCost:9,unitPrice:24,market:150},
+  pastries:{name:"Pastries",raw:"flour",input:"Flour",output:"Pastries",unitCost:5,unitPrice:16,market:145},
+  cheese:{name:"Cheese",raw:"milk",input:"Milk",output:"Cheese",unitCost:12,unitPrice:31,market:105},
+  softDrinks:{name:"Soft Drinks",raw:"syrup",input:"Drink syrup",output:"Soft drinks",unitCost:7,unitPrice:21,market:165},
+  cosmetics:{name:"Cosmetics",raw:"chemicals",input:"Cosmetic compounds",output:"Cosmetics",unitCost:22,unitPrice:68,market:95},
+  medicine:{name:"Medicine",raw:"pharma",input:"Pharma ingredients",output:"Medicine",unitCost:35,unitPrice:118,market:80},
+  computers:{name:"Computers",raw:"chips",input:"Microchips",output:"Computers",unitCost:210,unitPrice:520,market:45},
+  printers:{name:"Printers",raw:"components",input:"Components",output:"Printers",unitCost:86,unitPrice:230,market:58},
+  appliances:{name:"Appliances",raw:"steel",input:"Steel",output:"Appliances",unitCost:130,unitPrice:340,market:52},
+  luxuryCars:{name:"Luxury Cars",raw:"autoParts",input:"Auto parts",output:"Luxury cars",unitCost:1800,unitPrice:4200,market:14},
+  motorcycles:{name:"Motorcycles",raw:"autoParts",input:"Auto parts",output:"Motorcycles",unitCost:620,unitPrice:1450,market:22},
+  babyClothes:{name:"Baby Clothes",raw:"cotton",input:"Cotton",output:"Baby clothes",unitCost:10,unitPrice:29,market:116},
+  leatherJackets:{name:"Leather Jackets",raw:"leather",input:"Leather",output:"Leather jackets",unitCost:46,unitPrice:135,market:62},
+  petFood:{name:"Pet Food",raw:"grain",input:"Grain",output:"Pet food",unitCost:8,unitPrice:24,market:120},
+  books:{name:"Books",raw:"paper",input:"Paper",output:"Books",unitCost:9,unitPrice:26,market:88},
+  jewelry:{name:"Jewelry",raw:"preciousMetals",input:"Precious metals",output:"Jewelry",unitCost:180,unitPrice:520,market:28},
+  cleaningGoods:{name:"Cleaning Goods",raw:"chemicals",input:"Chemicals",output:"Cleaning goods",unitCost:8,unitPrice:25,market:125}
 };
 const progressionMilestones = [
   {id:"basic",name:"Cash Trader",description:"Market buy and sell orders",worth:0,day:1},
@@ -462,6 +491,12 @@ function facilityLabel(facility) {
   return `${facilityBlueprints[facility.type].name} - ${productLines[facility.line].name}`;
 }
 
+function facilityRole(type) {
+  if (type==="industry") return "industry";
+  if (type==="factory") return "factory";
+  return "store";
+}
+
 function empireMessage(text,good) {
   const el=document.querySelector("#empire-status");
   if (el) { el.textContent=text; el.className=good?"up":"down"; }
@@ -473,7 +508,8 @@ function buildFacility() {
   const blueprint=facilityBlueprints[type], company=companies[0], cost=blueprint.cost;
   if (!hasControl()) return empireMessage("You need board control to build facilities.",false);
   if (company.companyCash<cost) return empireMessage(`Nova needs $${cost}m cash to build this ${blueprint.name}.`,false);
-  const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:type==="industry"?0:60,finishedInventory:type==="store"?40:0,marketing:35,profit:0,lastUnits:0};
+  const role=facilityRole(type);
+  const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:role==="industry"?0:60,finishedInventory:role==="store"?40:0,marketing:35,profit:0,lastUnits:0};
   state.facilities.push(facility);
   company.companyCash-=cost;
   state.news.unshift({day:state.day,ticker:"NOVA",impact:.02,text:`${state.player.companyName} opened a ${facilityLabel(facility)}.`});
@@ -512,7 +548,7 @@ function runFacilities() {
   state.facilities.forEach(facility=>{
     const blueprint=facilityBlueprints[facility.type], line=productLines[facility.line], capacity=blueprint.capacity*facility.level;
     facility.profit=0; facility.lastUnits=0;
-    if (facility.type==="industry") {
+    if (facilityRole(facility.type)==="industry") {
       const made=Math.round(capacity*(.85+Math.random()*.3));
       rawPool[line.raw]=(rawPool[line.raw]||0)+made;
       facility.rawInventory+=made; facility.lastUnits=made;
@@ -522,7 +558,7 @@ function runFacilities() {
   });
   state.facilities.forEach(facility=>{
     const line=productLines[facility.line], capacity=facilityBlueprints[facility.type].capacity*facility.level;
-    if (facility.type==="factory") {
+    if (facilityRole(facility.type)==="factory") {
       const availableRaw=(rawPool[line.raw]||0)+facility.rawInventory;
       const rawUsed=Math.min(capacity,availableRaw);
       const external=Math.max(0,capacity-rawUsed);
@@ -537,7 +573,7 @@ function runFacilities() {
   });
   state.facilities.forEach(facility=>{
     const line=productLines[facility.line], capacity=facilityBlueprints[facility.type].capacity*facility.level;
-    if (facility.type==="store") {
+    if (facilityRole(facility.type)==="store") {
       const supply=(finishedPool[facility.line]||0)+facility.finishedInventory;
       const demand=Math.round(line.market*(1+Math.sqrt(facility.marketing/50)*.18)*(state.economy.confidence/100)*(.85+Math.random()*.3));
       const sold=Math.min(supply,capacity,demand);
@@ -1598,7 +1634,7 @@ function renderFacilities() {
       ["Marketing",`$${facility.marketing}k/day`],
       ["Last profit",`$${facility.profit.toFixed(3)}m`]
     ].map(item=>`<span>${item[0]}<strong>${item[1]}</strong></span>`).join("");
-    const stock=facility.type==="industry"?`${facility.rawInventory.toLocaleString()} ${line.input}`:`${facility.finishedInventory.toLocaleString()} ${line.output}`;
+    const stock=facilityRole(facility.type)==="industry"?`${facility.rawInventory.toLocaleString()} ${line.input}`:`${facility.finishedInventory.toLocaleString()} ${line.output}`;
     return `<article class="facility-card"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Price<strong>${money.format(line.unitPrice)}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
   }).join(""):`<div class="builder-card"><h3>No facilities yet</h3><p>Start small: build an industry for raw materials, a factory to make goods, and a store to sell them.</p></div>`;
   document.querySelectorAll("[data-upgrade-facility]").forEach(button=>button.onclick=()=>upgradeFacility(+button.dataset.upgradeFacility));
