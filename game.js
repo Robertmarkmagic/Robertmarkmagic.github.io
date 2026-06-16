@@ -65,6 +65,7 @@ const SAVE_KEY="market-foundry-save-v5";
 const TRADING_DAYS_PER_YEAR=240;
 const CAMPAIGN_YEARS=10;
 const CAMPAIGN_DAYS=TRADING_DAYS_PER_YEAR*CAMPAIGN_YEARS;
+const PUBLIC_SITE_URL="https://robertmarkmagic.github.io/";
 const initialCompanies=JSON.parse(JSON.stringify(companies));
 const initialState=JSON.parse(JSON.stringify(state));
 let orderId = 0;
@@ -699,18 +700,36 @@ function initCloud() {
 function authFields() {
   return {
     email:document.querySelector("#auth-email").value.trim(),
-    password:document.querySelector("#auth-password").value
+    password:document.querySelector("#auth-password").value,
+    mailingList:document.querySelector("#auth-mailing-list")?.checked ?? true
   };
+}
+
+function authRedirectUrl() {
+  return PUBLIC_SITE_URL;
+}
+
+async function addEmailSubscriber(email, source="signup") {
+  if (!supabaseClient || !email) return null;
+  const {error}=await supabaseClient.from("email_subscribers").upsert({
+    email:email.toLowerCase(),
+    user_id:currentUser?.id || null,
+    source,
+    subscribed:true,
+    updated_at:new Date().toISOString()
+  },{onConflict:"email"});
+  return error;
 }
 
 async function signUp() {
   if (!supabaseClient) return explainCloudSetup();
-  const {email,password}=authFields();
+  const {email,password,mailingList}=authFields();
   if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.",false);
-  const redirectTo=new URL(location.pathname || "/",location.origin).href;
+  const redirectTo=authRedirectUrl();
+  if (mailingList) await addEmailSubscriber(email,"signup-form");
   const {error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
   if (error) return updateCloudStatus(error.message,false);
-  updateCloudStatus("Account created. Check your email if confirmation is enabled, then sign in.",true);
+  updateCloudStatus("Account created. Check your email. The confirmation link will return to the live game.",true);
 }
 
 async function signIn() {
@@ -718,7 +737,9 @@ async function signIn() {
   const {email,password}=authFields();
   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
   if (error) return updateCloudStatus(error.message,false);
-  currentUser=data.user; updateCloudStatus();
+  currentUser=data.user;
+  if (document.querySelector("#auth-mailing-list")?.checked) await addEmailSubscriber(email,"sign-in-form");
+  updateCloudStatus();
 }
 
 async function signOut() {
