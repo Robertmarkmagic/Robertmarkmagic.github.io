@@ -232,3 +232,14 @@ input,select,textarea { font-size:16px; }
   .launch-copy { padding:26px; }
   .founder-setup { grid-template-columns:1fr; }
 }
+
+.founder-setup .portrait-grid,.founder-setup .logo-grid { overflow:visible; padding:0; scrollbar-width:none; grid-template-columns:repeat(5,minmax(46px,1fr)); grid-auto-rows:auto; }
+.founder-setup .portrait-grid::-webkit-scrollbar,.founder-setup .logo-grid::-webkit-scrollbar { display:none; }
+.founder-setup .portrait-grid button,.founder-setup .logo-grid button { width:100%; min-width:0; height:auto; aspect-ratio:1; }
+
+@media(min-width:821px){
+  .launch-card { width:min(1320px,98vw); }
+  .launch-copy { overflow-y:visible; }
+  .founder-setup { overflow:visible; }
+  .founder-setup .portrait-grid,.founder-setup .logo-grid { grid-template-columns:repeat(5,minmax(52px,1fr)); }
+}
