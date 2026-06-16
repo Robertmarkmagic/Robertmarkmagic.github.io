@@ -681,12 +681,16 @@ function updateCloudStatus(text, good=null) {
   const configured=cloudConfigured();
   document.querySelector("#auth-sign-up").disabled=false;
   document.querySelector("#auth-sign-in").disabled=false;
+  document.querySelector("#auth-resend").disabled=false;
+  document.querySelector("#auth-reset").disabled=false;
   document.querySelector("#auth-sign-out").disabled=!currentUser;
   document.querySelector("#cloud-save").disabled=!configured || !currentUser;
   document.querySelector("#cloud-load").disabled=!configured || !currentUser;
   if (!configured) {
     document.querySelector("#auth-sign-up").title="Add Supabase URL and anon key in supabase-config.js first.";
     document.querySelector("#auth-sign-in").title="Add Supabase URL and anon key in supabase-config.js first.";
+    document.querySelector("#auth-resend").title="Add Supabase URL and anon key in supabase-config.js first.";
+    document.querySelector("#auth-reset").title="Add Supabase URL and anon key in supabase-config.js first.";
   }
 }
 
@@ -742,7 +746,27 @@ async function signUp() {
   if (mailingList) await addEmailSubscriber(email,"signup-form");
   const {error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
   if (error) return updateCloudStatus(error.message,false);
-  updateCloudStatus("Account created. Check your email. The confirmation link will return to the live game.",true);
+  updateCloudStatus("Check your email. If this account already exists, use Sign in, Resend email, or Reset password.",true);
+}
+
+async function resendConfirmation() {
+  if (!supabaseClient) return explainCloudSetup();
+  const {email}=authFields();
+  if (!email) return updateCloudStatus("Enter your email first, then press Resend email.",false);
+  const {error}=await supabaseClient.auth.resend({type:"signup",email,options:{emailRedirectTo:authRedirectUrl()}});
+  if (error) return updateCloudStatus(error.message,false);
+  updateCloudStatus("Confirmation email sent again. Check inbox and spam folder.",true);
+  document.querySelector("#status-headline").textContent="Confirmation email resent.";
+}
+
+async function resetPassword() {
+  if (!supabaseClient) return explainCloudSetup();
+  const {email}=authFields();
+  if (!email) return updateCloudStatus("Enter your email first, then press Reset password.",false);
+  const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl()});
+  if (error) return updateCloudStatus(error.message,false);
+  updateCloudStatus("Password reset email sent. Check inbox and spam folder.",true);
+  document.querySelector("#status-headline").textContent="Password reset email sent.";
 }
 
 async function signIn() {
@@ -1671,7 +1695,7 @@ document.querySelector("#buy-option").onclick=buyOption; document.querySelector(
 document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});
 document.querySelector("#save-game").onclick=saveGame; document.querySelector("#load-game").onclick=loadGame; document.querySelector("#new-game").onclick=openLaunchModal; document.querySelector("#modal-button").onclick=()=>newGame(true);
 document.querySelector("#cloud-save").onclick=cloudSaveGame; document.querySelector("#cloud-load").onclick=cloudLoadGame;
-document.querySelector("#auth-sign-up").onclick=signUp; document.querySelector("#auth-sign-in").onclick=signIn; document.querySelector("#auth-sign-out").onclick=signOut;
+document.querySelector("#auth-sign-up").onclick=signUp; document.querySelector("#auth-sign-in").onclick=signIn; document.querySelector("#auth-resend").onclick=resendConfirmation; document.querySelector("#auth-reset").onclick=resetPassword; document.querySelector("#auth-sign-out").onclick=signOut;
 document.querySelector("#launch-start").onclick=()=>newGame(true);
 document.querySelector("#launch-load").onclick=()=>loadGame();
 document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};

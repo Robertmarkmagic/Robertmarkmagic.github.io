@@ -255,3 +255,5 @@ input,select,textarea { font-size:16px; }
   #launch-modal .launch-card { height:auto; min-height:calc(100dvh - 32px); overflow:visible; }
   #launch-modal .launch-copy { overflow:visible; }
 }
+
+.cloud-panel .cloud-actions { grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); }
