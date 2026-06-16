@@ -27,6 +27,8 @@ Object.assign(companies[0], {
   dailyOperatingProfit:0,
   dailyRevenue:0,
   marketShare:.18,
+  customerSatisfaction:72,
+  brandScore:68,
   totalShares:1000000,
   founderShares:750000,
   bondDebt:0,
@@ -589,7 +591,10 @@ function sellFacility(id,demolish=false) {
 
 function runFacilities() {
   if (!Array.isArray(state.facilities) || !state.facilities.length) return;
-  const company=companies[0], rawPool={}, finishedPool={};
+  const company=companies[0], settings=difficultySettings(), rawPool={}, finishedPool={};
+  // GAME BALANCE TUNING:
+  // Facilities use the same difficulty knobs as Nova operations. Easy gives
+  // friendlier demand and lower cost pressure; Hard makes supply mistakes expensive.
   let profit=0, units=0, revenue=0;
   state.facilities.forEach(facility=>{
     const blueprint=facilityBlueprints[facility.type], line=productLines[facility.line], capacity=blueprint.capacity*facility.level;
@@ -598,7 +603,7 @@ function runFacilities() {
       const made=Math.round(capacity*(.85+Math.random()*.3));
       rawPool[line.raw]=(rawPool[line.raw]||0)+made;
       facility.rawInventory+=made; facility.lastUnits=made;
-      const cost=made*line.unitCost*.35/1000000;
+      const cost=made*line.unitCost*.35*settings.costPressure/1000000;
       company.companyCash-=cost; profit-=cost;
     }
   });
@@ -613,7 +618,7 @@ function runFacilities() {
       const made=Math.round((rawUsed+external)*(.82+Math.random()*.12));
       finishedPool[facility.line]=(finishedPool[facility.line]||0)+made;
       facility.finishedInventory+=made; facility.lastUnits=made;
-      const cost=(made*line.unitCost+external*line.unitCost*.8)/1000000;
+      const cost=(made*line.unitCost+external*line.unitCost*.8)*settings.costPressure/1000000;
       company.companyCash-=cost; profit-=cost;
     }
   });
@@ -621,7 +626,7 @@ function runFacilities() {
     const line=productLines[facility.line], capacity=facilityBlueprints[facility.type].capacity*facility.level;
     if (facilityRole(facility.type)==="store") {
       const supply=(finishedPool[facility.line]||0)+facility.finishedInventory;
-      const demand=Math.round(line.market*(1+Math.sqrt(facility.marketing/50)*.18)*(state.economy.confidence/100)*(.85+Math.random()*.3));
+      const demand=Math.round(line.market*(1+Math.sqrt(facility.marketing/50)*settings.marketingEfficiency)*(state.economy.confidence/100)*settings.demandMultiplier*(1+(Math.random()-.5)*settings.demandRandomness*2));
       const sold=Math.min(supply,capacity,demand);
       facility.finishedInventory=Math.max(0,supply-sold);
       finishedPool[facility.line]=0;
@@ -650,10 +655,19 @@ function updateTakeoverMarket() {
 
 function difficultySettings() {
   return {
-    easy:{targetWorth:250000,targetShare:.25,costMultiplier:.92,volatility:.85,label:"Easy"},
-    normal:{targetWorth:500000,targetShare:.35,costMultiplier:1,volatility:1,label:"Normal"},
-    hard:{targetWorth:1000000,targetShare:.45,costMultiplier:1.1,volatility:1.2,label:"Hard"}
+    // GAME BALANCE TUNING:
+    // These numbers shape the core company loop. To rebalance later, start here.
+    // demandMultiplier controls baseline customer demand, marketingEfficiency controls
+    // how useful ad spending is, priceSensitivity controls how hard customers punish
+    // high prices, and fixedOperatingCost/costPressure control survival difficulty.
+    easy:{targetWorth:250000,targetShare:.25,costMultiplier:.92,volatility:.85,label:"Easy",demandMultiplier:1.12,marketingEfficiency:.21,priceSensitivity:1.18,costPressure:.92,fixedOperatingCost:.08,cashReserveRatio:.12,demandRandomness:.06,inventoryHoldingRate:.0018},
+    normal:{targetWorth:500000,targetShare:.35,costMultiplier:1,volatility:1,label:"Normal",demandMultiplier:1,marketingEfficiency:.17,priceSensitivity:1.35,costPressure:1,fixedOperatingCost:.12,cashReserveRatio:.18,demandRandomness:.10,inventoryHoldingRate:.0025},
+    hard:{targetWorth:1000000,targetShare:.45,costMultiplier:1.1,volatility:1.2,label:"Hard",demandMultiplier:.91,marketingEfficiency:.14,priceSensitivity:1.55,costPressure:1.08,fixedOperatingCost:.18,cashReserveRatio:.25,demandRandomness:.14,inventoryHoldingRate:.0034}
   }[state.difficulty];
+}
+
+function clamp(value,min,max) {
+  return Math.max(min,Math.min(max,value));
 }
 
 function campaignScore() {
@@ -1054,30 +1068,41 @@ function runPlayerCompany(company) {
     company.pendingDecisions=null;
     document.querySelector("#operations-status").textContent=`Active from day ${state.day}`;
   }
-  const macroDemand=Math.max(.55,Math.min(1.35,state.economy.confidence/100*(1+(state.economy.growth-.02)*3)));
+  const settings=difficultySettings();
+  // GAME BALANCE TUNING:
+  // This is the main daily operating loop for Nova. The order is:
+  // 1. estimate demand from price, marketing, quality, economy, and difficulty
+  // 2. produce only what cash can support while keeping a small liquidity reserve
+  // 3. sell available units, charge production/marketing/research/holding costs
+  // 4. update satisfaction, brand, market share, profit, and stock fundamentals
+  const macroDemand=clamp(state.economy.confidence/100*(1+(state.economy.growth-.02)*3)*settings.demandMultiplier,.5,1.45);
   const logisticsEfficiency=companies.find(c=>c.ticker==="AXIS")?.controlled ? .94 : 1;
   const energyEfficiency=companies.find(c=>c.ticker==="GRNW")?.controlled ? .97 : 1;
   const retailSynergy=companies.find(c=>c.ticker==="HARB")?.controlled ? .08 : 0;
-  let totalRevenue=0,totalProductionCost=0,totalMarketing=0,totalSold=0,totalInventory=0;
-  for (const product of company.products.filter(p=>p.active)) {
+  const activeProducts=company.products.filter(p=>p.active);
+  let totalRevenue=0,totalProductionCost=0,totalMarketing=0,totalSold=0,totalInventory=0,totalDemand=0,totalHoldingCost=0,totalPotential=0;
+  for (const product of activeProducts) {
     product.competitorPrice=Math.max(product.unitCost*1.25,product.competitorPrice*(1+(Math.random()-.5)*.018+state.economy.inflation/240));
     const relativePrice=product.competitorPrice/product.price;
-    const priceAppeal=Math.max(.3,Math.min(1.8,relativePrice**1.35));
-    const marketingLift=1+Math.sqrt(product.marketing/100)*.16+retailSynergy;
-    const qualityLift=Math.max(.65,.65+product.quality*.35);
-    const demand=Math.max(80,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand*(.9+Math.random()*.2)));
-    const inflatedUnitCost=product.unitCost*(1+Math.max(-.02,state.economy.inflation)*1.4)*logisticsEfficiency*energyEfficiency;
-    const discretionaryCost=(product.marketing+company.research/company.products.filter(p=>p.active).length)*1000;
-    const availableCash=Math.max(0,company.companyCash*1000000-totalProductionCost*1000000-totalMarketing*1000-discretionaryCost);
+    const priceAppeal=clamp(relativePrice**settings.priceSensitivity,.32,1.85);
+    const marketingLift=1+Math.sqrt(product.marketing/100)*settings.marketingEfficiency+retailSynergy;
+    const qualityLift=clamp(.72+product.quality*.28,.7,1.24);
+    const demandNoise=1+(Math.random()-.5)*settings.demandRandomness*2;
+    const demand=Math.max(60,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand*demandNoise));
+    const inflatedUnitCost=product.unitCost*(1+Math.max(-.02,state.economy.inflation)*1.35)*settings.costPressure*logisticsEfficiency*energyEfficiency;
+    const discretionaryCost=(product.marketing+company.research/activeProducts.length)*1000;
+    const cashReserve=company.companyCash*1000000*settings.cashReserveRatio;
+    const availableCash=Math.max(0,company.companyCash*1000000-totalProductionCost*1000000-totalMarketing*1000-discretionaryCost-cashReserve);
     const produced=Math.min(product.production,Math.floor(availableCash/inflatedUnitCost));
     const available=product.inventory+produced;
     const sold=Math.min(available,demand);
     product.inventory=available-sold; product.dailySales=sold;
-    totalSold+=sold; totalInventory+=product.inventory; totalRevenue+=sold*product.price/1000000;
+    const holdingCost=product.inventory*product.unitCost*settings.inventoryHoldingRate/1000000;
+    totalDemand+=demand; totalPotential+=product.marketPotential; totalSold+=sold; totalInventory+=product.inventory; totalRevenue+=sold*product.price/1000000; totalHoldingCost+=holdingCost;
     totalProductionCost+=produced*inflatedUnitCost/1000000; totalMarketing+=product.marketing;
   }
   company.dailyInterest=company.bondDebt*company.bondRate/240;
-  const operatingCost=(totalMarketing+company.research)/1000+.12;
+  const operatingCost=(totalMarketing+company.research)/1000+settings.fixedOperatingCost+totalHoldingCost;
   const subsidiaryIncome=companies.slice(1).reduce((sum,target)=>sum+(target.profit/240)*target.novaStake,0);
   const synergy=controlledSubsidiaries().reduce((sum,target)=>sum+acquisitionSynergy(target),0);
   const profit=totalRevenue-totalProductionCost-operatingCost-company.dailyInterest+subsidiaryIncome+synergy;
@@ -1087,12 +1112,15 @@ function runPlayerCompany(company) {
   company.dailyRevenue=totalRevenue;
   company.dailyOperatingProfit=profit;
   const researchSynergy=companies.find(c=>c.ticker==="MEDI")?.controlled?1.35:1;
-  company.products.filter(p=>p.active).forEach(p=>p.quality=Math.min(1.75,p.quality+company.research/250000/company.products.filter(x=>x.active).length*researchSynergy));
-  company.quality=company.products.filter(p=>p.active).reduce((sum,p)=>sum+p.quality,0)/company.products.filter(p=>p.active).length;
-  company.marketShare=Math.max(.04,Math.min(.6,company.marketShare*.94+(totalSold/9000)*.06));
+  activeProducts.forEach(p=>p.quality=Math.min(1.75,p.quality+company.research/260000/activeProducts.length*researchSynergy));
+  company.quality=activeProducts.reduce((sum,p)=>sum+p.quality,0)/activeProducts.length;
+  const fillRate=totalDemand?totalSold/totalDemand:0, inventoryDays=totalSold?totalInventory/totalSold:totalInventory/Math.max(1,activeProducts.reduce((sum,p)=>sum+p.production,0));
+  company.customerSatisfaction=clamp(50+fillRate*30+company.quality*12-Math.max(0,inventoryDays-6)*4+(profit>=0?5:-7),0,100);
+  company.brandScore=clamp(38+company.quality*25+Math.sqrt(totalMarketing)*3+company.marketShare*45,0,100);
+  company.marketShare=clamp(company.marketShare*.94+(totalSold/Math.max(1,totalPotential*7))*.06,.04,.68);
   company.revenue=Math.max(1,Math.round(company.revenue*.985+totalRevenue*240*.015));
   company.profit=Math.round((company.profit*.985+profit*240*.015)*10)/10;
-  company.growth=Math.max(-.25,Math.min(.4,(company.dailySales/1800-1)*.12+(company.quality-1)*.08));
+  company.growth=clamp((fillRate-.75)*.16+(company.quality-1)*.08+(company.customerSatisfaction-65)/1000,-.25,.4);
   if (company.companyCash<2) {
     state.news.unshift({day:state.day,text:"Nova Devices warns that its cash reserves are dangerously low.",impact:-.06,ticker:company.ticker});
     state.news=state.news.slice(0,6);
@@ -1266,8 +1294,8 @@ function businessSignals() {
   const activeProduction=active.reduce((sum,p)=>sum+p.production,0)||1;
   const demand=Math.max(0,Math.min(1.4,c.dailySales/potential));
   const inventoryDays=c.dailySales>0?c.inventory/c.dailySales:c.inventory/activeProduction;
-  const satisfaction=Math.max(0,Math.min(100,Math.round(62+demand*30-Math.max(0,inventoryDays-5)*5+(c.dailyOperatingProfit>=0?8:-12))));
-  const brand=Math.max(0,Math.min(100,Math.round(c.quality*42+Math.sqrt(active.reduce((sum,p)=>sum+p.marketing,0))*3)));
+  const satisfaction=Math.round(c.customerSatisfaction ?? clamp(62+demand*30-Math.max(0,inventoryDays-5)*5+(c.dailyOperatingProfit>=0?8:-12),0,100));
+  const brand=Math.round(c.brandScore ?? clamp(c.quality*42+Math.sqrt(active.reduce((sum,p)=>sum+p.marketing,0))*3,0,100));
   const bottleneck=facilityBottleneck();
   return {demand,satisfaction,brand,inventoryDays,bottleneck};
 }
@@ -1788,6 +1816,8 @@ function renderOperations() {
     ["Inventory",c.inventory.toLocaleString(),c.inventory<5000],
     ["Daily profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
     ["Portfolio quality",`${Math.round(c.quality*100)} / 175`,c.quality>=1],
+    ["Customer satisfaction",`${Math.round(c.customerSatisfaction ?? 72)} / 100`,(c.customerSatisfaction ?? 72)>=60],
+    ["Brand score",`${Math.round(c.brandScore ?? 68)} / 100`,(c.brandScore ?? 68)>=55],
     ["Market share",pct(c.marketShare),c.marketShare>=.15]
   ];
   document.querySelector("#operations-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
@@ -1812,20 +1842,26 @@ function managementInputs() {
 }
 
 function estimateManagementImpact(product, inputs) {
-  const c=companies[0], activeCount=Math.max(1,c.products.filter(p=>p.active).length);
-  const macroDemand=Math.max(.55,Math.min(1.35,state.economy.confidence/100*(1+(state.economy.growth-.02)*3)));
+  const c=companies[0], settings=difficultySettings(), activeCount=Math.max(1,c.products.filter(p=>p.active).length);
+  // GAME BALANCE TUNING:
+  // Keep this preview formula aligned with runPlayerCompany(), but without random demand noise.
+  // This is what teaches the player how price, marketing, production, and inventory affect profit.
+  const macroDemand=clamp(state.economy.confidence/100*(1+(state.economy.growth-.02)*3)*settings.demandMultiplier,.5,1.45);
   const relativePrice=product.competitorPrice/Math.max(1,inputs.price);
-  const priceAppeal=Math.max(.3,Math.min(1.8,relativePrice**1.35));
-  const marketingLift=1+Math.sqrt(inputs.marketing/100)*.16;
-  const qualityLift=Math.max(.65,.65+product.quality*.35);
-  const demand=Math.max(80,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand));
-  const produced=Math.min(inputs.production,Math.max(0,Math.floor((c.companyCash*1000000)/(product.unitCost||1))));
+  const priceAppeal=clamp(relativePrice**settings.priceSensitivity,.32,1.85);
+  const marketingLift=1+Math.sqrt(inputs.marketing/100)*settings.marketingEfficiency;
+  const qualityLift=clamp(.72+product.quality*.28,.7,1.24);
+  const demand=Math.max(60,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand));
+  const inflatedUnitCost=product.unitCost*(1+Math.max(-.02,state.economy.inflation)*1.35)*settings.costPressure;
+  const cashReserve=c.companyCash*1000000*settings.cashReserveRatio;
+  const produced=Math.min(inputs.production,Math.max(0,Math.floor((c.companyCash*1000000-cashReserve)/(inflatedUnitCost||1))));
   const available=product.inventory+produced;
   const sold=Math.min(available,demand);
   const revenue=sold*inputs.price/1000000;
-  const cost=produced*product.unitCost/1000000+(inputs.marketing+inputs.research/activeCount)/1000;
-  const profit=revenue-cost;
   const endingInventory=available-sold;
+  const holdingCost=endingInventory*product.unitCost*settings.inventoryHoldingRate/1000000;
+  const cost=produced*inflatedUnitCost/1000000+(inputs.marketing+inputs.research/activeCount)/1000+settings.fixedOperatingCost+holdingCost;
+  const profit=revenue-cost;
   const qualityGain=inputs.research/12000;
   return {demand,produced,sold,profit,endingInventory,qualityGain};
 }
