@@ -625,9 +625,22 @@ function applySavePayload(payload, label="Saved game loaded.") {
 }
 
 function saveGame() {
-  const payload=makeSavePayload();
-  localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
-  addLedger("Game saved",0); render();
+  try {
+    const payload=makeSavePayload();
+    localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+    addLedger("Game saved",0);
+    render();
+    message(`Game saved locally at ${new Date(payload.savedAt).toLocaleTimeString()}.`,true);
+    document.querySelector("#status-headline").textContent="Game saved locally in this browser.";
+    playCue("order");
+    return true;
+  } catch (error) {
+    const text="Save failed. Your browser may be blocking local storage.";
+    message(text,false);
+    document.querySelector("#status-headline").textContent=text;
+    playCue("error");
+    return false;
+  }
 }
 
 function loadGame() {
@@ -749,7 +762,13 @@ async function signOut() {
 }
 
 async function cloudSaveGame() {
-  if (!cloudReady()) return updateCloudStatus("Sign in before using cloud saves.");
+  if (!cloudReady()) {
+    const text="Sign in before using cloud saves. Local Save still works.";
+    updateCloudStatus(text,false);
+    message(text,false);
+    document.querySelector("#status-headline").textContent=text;
+    return;
+  }
   const payload=makeSavePayload();
   const {error}=await supabaseClient.from("saved_games").upsert({
     user_id:currentUser.id,
@@ -757,9 +776,20 @@ async function cloudSaveGame() {
     payload,
     updated_at:new Date().toISOString()
   },{onConflict:"user_id,slot"});
-  if (error) return updateCloudStatus(error.message);
+  if (error) {
+    updateCloudStatus(error.message,false);
+    message(error.message,false);
+    document.querySelector("#status-headline").textContent=`Cloud save failed: ${error.message}`;
+    playCue("error");
+    return;
+  }
   localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
-  addLedger("Cloud save complete",0); updateCloudStatus("Cloud save complete."); render();
+  addLedger("Cloud save complete",0);
+  updateCloudStatus("Cloud save complete.",true);
+  render();
+  message(`Cloud save complete at ${new Date(payload.savedAt).toLocaleTimeString()}.`,true);
+  document.querySelector("#status-headline").textContent="Cloud save complete.";
+  playCue("order");
 }
 
 async function cloudLoadGame() {
