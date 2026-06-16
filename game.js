@@ -74,6 +74,7 @@ let currentUser = null;
 let audioContext = null;
 let audioEnabled = false;
 const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null };
+const guideState = { productClass:"food", product:"bread" };
 const facilityBlueprints = {
   factory:{name:"Factory",cost:12,capacity:140,role:"Produces finished goods"},
   store:{name:"Retail Store",cost:7,capacity:90,role:"Sells finished goods to consumers"},
@@ -114,6 +115,16 @@ const productLines = {
   jewelry:{name:"Jewelry",raw:"preciousMetals",input:"Precious metals",output:"Jewelry",unitCost:180,unitPrice:520,market:28},
   cleaningGoods:{name:"Cleaning Goods",raw:"chemicals",input:"Chemicals",output:"Cleaning goods",unitCost:8,unitPrice:25,market:125}
 };
+const productClasses = [
+  {id:"food",name:"Food & Bakery",items:["bread","coffee","pastries","cheese","softDrinks","petFood"]},
+  {id:"fashion",name:"Apparel",items:["shirts","babyClothes","leatherJackets"]},
+  {id:"electronics",name:"Computer & Electronics",items:["phones","computers","printers","appliances"]},
+  {id:"vehicles",name:"Vehicles",items:["luxuryCars","motorcycles"]},
+  {id:"health",name:"Health & Body Care",items:["medicine","cosmetics","cleaningGoods"]},
+  {id:"construction",name:"Building Materials",items:["bricks"]},
+  {id:"energy",name:"Energy",items:["fuel"]},
+  {id:"media",name:"Books & Luxury",items:["books","jewelry"]}
+];
 const progressionMilestones = [
   {id:"basic",name:"Cash Trader",description:"Market buy and sell orders",worth:0,day:1},
   {id:"limit",name:"Order Specialist",description:"Limit orders and patient execution",worth:105000,day:10},
@@ -1620,6 +1631,65 @@ function renderProducts() {
   document.querySelectorAll("[data-launch-product]").forEach(button=>button.onclick=()=>launchProduct(+button.dataset.launchProduct));
 }
 
+function guideClassForProduct(key) {
+  return productClasses.find(group=>group.items.includes(key)) || productClasses[0];
+}
+
+function recommendedShopType(key) {
+  const picks={
+    fuel:"gasStation",coffee:"bakery",pastries:"bakery",bread:"bakery",cheese:"groceryShop",softDrinks:"groceryShop",
+    medicine:"pharmacy",cosmetics:"pharmacy",phones:"electronicsShop",computers:"electronicsShop",printers:"electronicsShop",appliances:"homeShop",
+    shirts:"fashionShop",babyClothes:"fashionShop",leatherJackets:"fashionShop",petFood:"petShop",books:"bookShop",jewelry:"jewelryShop",cleaningGoods:"homeShop"
+  };
+  return picks[key] || "store";
+}
+
+function renderManufacturerGuide() {
+  const classList=document.querySelector("#guide-classes"), productList=document.querySelector("#guide-products"), detail=document.querySelector("#guide-detail");
+  if (!classList || !productList || !detail) return;
+  let group=productClasses.find(item=>item.id===guideState.productClass) || productClasses[0];
+  if (!group.items.includes(guideState.product)) guideState.product=group.items[0];
+  const line=productLines[guideState.product], shopType=recommendedShopType(guideState.product), shop=facilityBlueprints[shopType];
+  const grossMargin=(line.unitPrice-line.unitCost)/line.unitPrice;
+  const techHeavy=["computers","phones","medicine","printers","appliances"].includes(guideState.product);
+  const productionQuality=techHeavy?.35:.2;
+  const rawQuality=1-productionQuality;
+  classList.innerHTML=productClasses.map(item=>`<button class="${item.id===group.id?"active":""}" data-guide-class="${item.id}"><span>${item.name}</span><strong>${item.items.length}</strong></button>`).join("");
+  productList.innerHTML=group.items.map(key=>`<button class="${key===guideState.product?"active":""}" data-guide-product="${key}"><span>${productLines[key].name}</span><small>${productLines[key].input} -> ${productLines[key].output}</small></button>`).join("");
+  detail.innerHTML=`<div class="guide-recipe-card">
+    <div class="guide-card-main">
+      <div class="guide-product-art"><span>${line.name.slice(0,2).toUpperCase()}</span></div>
+      <div><p class="eyebrow">MANUFACTURER'S GUIDE</p><h3>${line.name}</h3><span>${group.name}</span></div>
+    </div>
+    <div class="guide-flow">
+      <div><strong>${line.input}</strong><span>1 unit raw input</span></div>
+      <i></i>
+      <div><strong>${line.output}</strong><span>Factory output</span></div>
+      <i></i>
+      <div><strong>${shop.name}</strong><span>Recommended seller</span></div>
+    </div>
+    <div class="guide-quality">
+      <h3>Quality is determined by</h3>
+      <p><span>Production Tech</span><strong>${Math.round(productionQuality*100)}%</strong></p>
+      <p><span>Raw Material Quality</span><strong>${Math.round(rawQuality*100)}%</strong></p>
+      <p><span>Tech Known to You</span><strong class="up">Yes</strong></p>
+    </div>
+    <div class="guide-stats">
+      <span>Unit cost<strong>${money.format(line.unitCost)}</strong></span>
+      <span>Retail price<strong>${money.format(line.unitPrice)}</strong></span>
+      <span>Gross margin<strong>${Math.round(grossMargin*100)}%</strong></span>
+      <span>Market size<strong>${line.market.toLocaleString()} demand/day</strong></span>
+    </div>
+    <div class="guide-build-path">
+      <strong>Suggested build path</strong>
+      <p>1. Build Raw-material Industry for ${line.input}. 2. Build Factory for ${line.output}. 3. Build ${shop.name} to sell it.</p>
+    </div>
+  </div>`;
+  classList.querySelectorAll("[data-guide-class]").forEach(button=>button.onclick=()=>{guideState.productClass=button.dataset.guideClass;guideState.product=(productClasses.find(x=>x.id===guideState.productClass)||productClasses[0]).items[0];renderManufacturerGuide();});
+  productList.querySelectorAll("[data-guide-product]").forEach(button=>button.onclick=()=>{guideState.product=button.dataset.guideProduct;guideState.productClass=guideClassForProduct(guideState.product).id;renderManufacturerGuide();});
+  document.querySelector("#guide-status").textContent=`${line.input} -> ${line.output}`;
+}
+
 function renderFacilities() {
   ensureStateDefaults();
   const list=document.querySelector("#facility-list");
@@ -1645,6 +1715,7 @@ function renderFacilities() {
     return `<div class="supply-card"><strong>${line.name}</strong><p>${line.input} -> ${line.output}. ${count} owned facility${count===1?"":"ies"}.</p></div>`;
   }).join("");
   document.querySelector("#build-facility").disabled=!hasControl() || company.companyCash<Math.min(...Object.values(facilityBlueprints).map(x=>x.cost));
+  renderManufacturerGuide();
 }
 
 function renderFinance() {
