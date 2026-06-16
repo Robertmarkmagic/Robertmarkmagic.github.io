@@ -59,6 +59,7 @@ const state = {
   equityHistory:[100000], dayStartEquity:100000,
   player:{name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"},
   facilities:[],
+  selectedFacilityId:null,
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
@@ -333,6 +334,8 @@ function nextTutorialStep() {
 function ensureStateDefaults() {
   if (!state.player) state.player={name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"};
   if (!Array.isArray(state.facilities)) state.facilities=[];
+  if (!state.selectedFacilityId && state.facilities[0]) state.selectedFacilityId=state.facilities[0].id;
+  if (state.selectedFacilityId && !state.facilities.some(f=>f.id===state.selectedFacilityId)) state.selectedFacilityId=state.facilities[0]?.id || null;
   if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
 }
@@ -522,6 +525,7 @@ function buildFacility() {
   const role=facilityRole(type);
   const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:role==="industry"?0:60,finishedInventory:role==="store"?40:0,marketing:35,profit:0,lastUnits:0};
   state.facilities.push(facility);
+  state.selectedFacilityId=facility.id;
   company.companyCash-=cost;
   state.news.unshift({day:state.day,ticker:"NOVA",impact:.02,text:`${state.player.companyName} opened a ${facilityLabel(facility)}.`});
   state.news=state.news.slice(0,6);
@@ -549,6 +553,19 @@ function marketFacility(id) {
   company.companyCash-=1; facility.marketing+=20;
   addLedger(`Marketing push: ${facilityLabel(facility)}`,-1000000);
   empireMessage(`${facilityLabel(facility)} marketing increased.`,true);
+  render();
+}
+
+function sellFacility(id,demolish=false) {
+  const facility=state.facilities.find(item=>item.id===id), company=companies[0];
+  if (!facility) return;
+  const base=facilityBlueprints[facility.type].cost, recovery=demolish ? .35 : .68;
+  const value=(base+facility.level*2)*recovery;
+  company.companyCash+=value;
+  state.facilities=state.facilities.filter(item=>item.id!==id);
+  state.selectedFacilityId=state.facilities[0]?.id || null;
+  addLedger(`${demolish?"Demolished":"Sold"} ${facilityLabel(facility)}`,value*1000000);
+  empireMessage(`${demolish?"Demolished":"Sold"} ${facilityLabel(facility)} for $${value.toFixed(2)}m.`,true);
   render();
 }
 
@@ -1690,6 +1707,53 @@ function renderManufacturerGuide() {
   document.querySelector("#guide-status").textContent=`${line.input} -> ${line.output}`;
 }
 
+function renderSparkBars(value,positive=true) {
+  return Array.from({length:12},(_,index)=>{
+    const height=Math.max(8,Math.min(100,18+index*5+Math.sin((state.day+index)/2)*18+(positive?value*12:-value*10)));
+    return `<b style="height:${height}%"></b>`;
+  }).join("");
+}
+
+function renderFirmView() {
+  const identity=document.querySelector("#firm-identity");
+  if (!identity) return;
+  ensureStateDefaults();
+  const facility=state.facilities.find(item=>item.id===state.selectedFacilityId);
+  const slots=document.querySelector("#firm-product-slots"), info=document.querySelector("#firm-info"), building=document.querySelector("#firm-building");
+  if (!facility) {
+    identity.innerHTML="<strong>No firm selected</strong><span>Build a facility to open the firm operations screen.</span>";
+    document.querySelector("#firm-profit").textContent="$0";
+    document.querySelector("#firm-revenue").textContent="$0";
+    document.querySelector("#firm-profit-spark").innerHTML=renderSparkBars(0);
+    document.querySelector("#firm-revenue-spark").innerHTML=renderSparkBars(0);
+    slots.innerHTML="<div class=\"firm-empty\">No product slots yet.</div>";
+    info.innerHTML="<p>Select or build a facility to manage products, marketing, upgrades, and exits.</p>";
+    building.className="firm-building";
+    return;
+  }
+  const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type], role=facilityRole(facility.type);
+  const revenue=Math.max(0,facility.lastUnits*line.unitPrice/1000000), profit=facility.profit||0;
+  identity.innerHTML=`<div class="firm-portrait">${blueprint.name.slice(0,2).toUpperCase()}</div><div><strong>${facilityLabel(facility)}</strong><span>${state.player.companyName} &middot; ${blueprint.role}</span></div>`;
+  document.querySelector("#firm-profit").textContent=`${profit>=0?"+":""}$${profit.toFixed(3)}m`;
+  document.querySelector("#firm-profit").className=profit>=0?"up":"down";
+  document.querySelector("#firm-revenue").textContent=`$${revenue.toFixed(3)}m`;
+  document.querySelector("#firm-profit-spark").innerHTML=renderSparkBars(profit,profit>=0);
+  document.querySelector("#firm-revenue-spark").innerHTML=renderSparkBars(revenue,true);
+  const productSlots=[
+    {name:line.input,label:"Input",units:role==="industry"?facility.rawInventory:facility.rawInventory,quality:70},
+    {name:line.output,label:role==="industry"?"Extracted":"Output",units:role==="store"?facility.finishedInventory:facility.lastUnits,quality:Math.min(95,55+facility.level*8)},
+    {name:"Marketing",label:"Demand",units:facility.marketing,quality:Math.min(100,facility.marketing)},
+    {name:"Service",label:"Store quality",units:facility.level,quality:Math.min(100,45+facility.level*14)}
+  ];
+  slots.innerHTML=productSlots.map(slot=>`<article class="firm-slot"><div class="firm-slot-art">${slot.name.slice(0,2).toUpperCase()}</div><div><strong>${slot.name}</strong><span>${slot.label}</span><small>${Number(slot.units).toLocaleString()} units</small></div><i style="--q:${slot.quality}%"></i></article>`).join("");
+  building.className=`firm-building firm-${role}`;
+  info.innerHTML=`<h3>${blueprint.name}</h3><p>${line.input} -> ${line.output}</p><div class="firm-info-grid"><span>Level<strong>${facility.level}</strong></span><span>Last units<strong>${facility.lastUnits.toLocaleString()}</strong></span><span>Inventory<strong>${(role==="industry"?facility.rawInventory:facility.finishedInventory).toLocaleString()}</strong></span><span>Marketing<strong>$${facility.marketing}k/day</strong></span></div>`;
+  document.querySelector("#firm-upgrade").onclick=()=>upgradeFacility(facility.id);
+  document.querySelector("#firm-market").onclick=()=>marketFacility(facility.id);
+  document.querySelector("#firm-sell").onclick=()=>sellFacility(facility.id,false);
+  document.querySelector("#firm-demolish").onclick=()=>sellFacility(facility.id,true);
+}
+
 function renderFacilities() {
   ensureStateDefaults();
   const list=document.querySelector("#facility-list");
@@ -1705,8 +1769,9 @@ function renderFacilities() {
       ["Last profit",`$${facility.profit.toFixed(3)}m`]
     ].map(item=>`<span>${item[0]}<strong>${item[1]}</strong></span>`).join("");
     const stock=facilityRole(facility.type)==="industry"?`${facility.rawInventory.toLocaleString()} ${line.input}`:`${facility.finishedInventory.toLocaleString()} ${line.output}`;
-    return `<article class="facility-card"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Price<strong>${money.format(line.unitPrice)}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
+    return `<article class="facility-card ${facility.id===state.selectedFacilityId?"selected":""}" data-select-facility="${facility.id}"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Price<strong>${money.format(line.unitPrice)}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
   }).join(""):`<div class="builder-card"><h3>No facilities yet</h3><p>Start small: build an industry for raw materials, a factory to make goods, and a store to sell them.</p></div>`;
+  document.querySelectorAll("[data-select-facility]").forEach(card=>card.onclick=event=>{if(event.target.tagName==="BUTTON")return;state.selectedFacilityId=+card.dataset.selectFacility;render();});
   document.querySelectorAll("[data-upgrade-facility]").forEach(button=>button.onclick=()=>upgradeFacility(+button.dataset.upgradeFacility));
   document.querySelectorAll("[data-market-facility]").forEach(button=>button.onclick=()=>marketFacility(+button.dataset.marketFacility));
   const supply=document.querySelector("#supply-chain");
@@ -1715,6 +1780,7 @@ function renderFacilities() {
     return `<div class="supply-card"><strong>${line.name}</strong><p>${line.input} -> ${line.output}. ${count} owned facility${count===1?"":"ies"}.</p></div>`;
   }).join("");
   document.querySelector("#build-facility").disabled=!hasControl() || company.companyCash<Math.min(...Object.values(facilityBlueprints).map(x=>x.cost));
+  renderFirmView();
   renderManufacturerGuide();
 }
 

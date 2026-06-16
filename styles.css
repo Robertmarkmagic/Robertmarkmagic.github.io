@@ -62,6 +62,39 @@ label { color:var(--muted); } input { display:block; margin-top:6px; width:100%;
 @keyframes decision-applied { 0%{transform:scale(.985);filter:brightness(1)} 45%{transform:scale(1.015);filter:brightness(1.45)} 100%{transform:none;filter:none} }
 .operations-kpis { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); } .operations-kpis div { padding:12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); } .operations-kpis div:nth-child(even) { border-right:0; } .operations-kpis span { color:var(--muted); display:block; font-size:11px; } .operations-kpis strong { font-size:17px; }
 .empire-grid { display:grid; grid-template-columns:.85fr 1.6fr .9fr; gap:20px; padding:22px; } .builder-card,.facility-card,.supply-card { background:#0b2f70; border:1px solid #5aa8f5; border-radius:14px; padding:14px; box-shadow:inset 0 0 18px #00133766; } .builder-card h3 { color:#fff6a6; margin-bottom:10px; } .builder-card label { display:block; margin:10px 0; } .builder-card select { width:100%; margin-top:5px; } .builder-card p,.supply-card p { color:#b9d8ff; font-size:12px; margin-top:10px; } .facility-list { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; } .facility-card h3 { color:#fff6a6; font-size:15px; letter-spacing:0; text-transform:none; } .facility-card small { color:#9ed0ff; } .facility-kpis { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:12px 0; } .facility-kpis span { color:#9ed0ff; font-size:11px; } .facility-kpis strong { display:block; color:#fff; } .facility-card button { width:100%; margin-top:8px; }
+.facility-card { cursor:pointer; }
+.facility-card.selected { box-shadow:inset 0 4px #fbbf24,0 0 20px #fbbf2444; border-color:#fff6a6; }
+.firm-view { border-top:3px ridge #49a3f3; background:linear-gradient(180deg,#0c4c9f,#061b41); }
+.firm-topbar { display:grid; grid-template-columns:1.2fr 1fr 1.2fr; gap:10px; padding:12px; background:#0a5cc2; border-bottom:3px ridge #49a3f3; }
+#firm-identity { display:grid; grid-template-columns:70px 1fr; gap:10px; align-items:center; background:#0f75d8; border:2px ridge #58adff; padding:8px; }
+#firm-identity strong,#firm-identity span { display:block; }
+.firm-portrait { display:grid; place-items:center; height:58px; background:linear-gradient(135deg,#09204c,#1ba6ff); border:2px ridge #f7df72; color:#fff6a6; font-weight:900; }
+.firm-mini-kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.firm-mini-kpis div { padding:8px; background:#084396; border:2px ridge #58adff; }
+.firm-mini-kpis span,.firm-mini-kpis strong { display:block; }
+.firm-mini-kpis i { display:flex; align-items:end; gap:2px; height:34px; margin-top:5px; border-bottom:2px solid #fff6a6; }
+.firm-mini-kpis b { flex:1; background:#e51b2d; min-height:4px; }
+.firm-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.firm-actions button { padding:6px 8px; font-weight:800; }
+.firm-product-slots { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:10px; background:#6b5b53; border-bottom:3px ridge #49a3f3; }
+.firm-slot { display:grid; grid-template-columns:120px 1fr 18px; gap:8px; min-height:112px; padding:8px; background:#e7e1cc; color:#082044; border:3px ridge #f7df72; }
+.firm-slot-art { display:grid; place-items:center; background:radial-gradient(circle at 40% 30%,#fff,#9cc9ff 45%,#284c78); border:2px solid #27395b; color:#08306b; font-weight:900; font-size:26px; }
+.firm-slot strong,.firm-slot span,.firm-slot small { display:block; }
+.firm-slot i { align-self:stretch; background:linear-gradient(to top,#e51b2d 0 30%,#f7df72 30% 65%,#1f9d55 65%); position:relative; }
+.firm-slot i:after { content:""; position:absolute; left:0; right:0; bottom:var(--q); height:4px; background:#fff; box-shadow:0 0 8px #000; }
+.firm-map { min-height:330px; position:relative; overflow:hidden; background:linear-gradient(30deg,#7aa06c 0 24%,transparent 24.5%),linear-gradient(150deg,#98b47a 0 24%,transparent 24.5%),linear-gradient(#6f9e64,#446d48); background-size:120px 70px; }
+.firm-map:before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#d8d1b8 0 12px,transparent 12px 96px,#d8d1b8 96px 108px,transparent 108px),linear-gradient(#2f3647 0 28px,transparent 28px 92px,#2f3647 92px 120px,transparent 120px); background-size:220px 170px; opacity:.45; transform:skewY(-18deg) scale(1.2); }
+.firm-building { position:absolute; left:34%; top:28%; width:260px; height:150px; transform:skewY(-18deg); background:linear-gradient(135deg,#f4d35e,#f97316); border:4px ridge #fff6a6; box-shadow:22px 28px 0 #0005,0 0 35px #0008; }
+.firm-building:before { content:""; position:absolute; inset:18px; background:repeating-linear-gradient(90deg,#0a3f88 0 18px,#bfe7ff 18px 28px); opacity:.75; }
+.firm-factory { background:linear-gradient(135deg,#747d8c,#2f3542); }
+.firm-industry { background:linear-gradient(135deg,#8b5e34,#4b2d14); }
+.firm-store { background:linear-gradient(135deg,#f4d35e,#f97316); }
+.firm-info { position:absolute; right:18px; bottom:18px; width:min(420px,45%); padding:14px; background:#061d48e8; border:2px ridge #58adff; border-radius:14px; box-shadow:0 12px 30px #0008; }
+.firm-info h3 { color:#fff6a6; }
+.firm-info-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:10px; }
+.firm-info-grid span { background:#0b2f70; border:1px solid #55aaff; border-radius:8px; padding:8px; color:#9ed0ff; }
+.firm-info-grid strong { display:block; color:#fff; }
+.firm-empty { padding:20px; color:#b9d8ff; }
 .manufacturer-guide { border-top:3px ridge #49a3f3; background:linear-gradient(145deg,#082b69,#041a3d); }
 .guide-grid { display:grid; grid-template-columns:.8fr 1fr 1.35fr; gap:18px; padding:20px; }
 .guide-column,.guide-recipe-card { background:#061d48; border:2px ridge #55aaff; border-radius:14px; padding:12px; box-shadow:inset 0 0 18px #0007; }
@@ -142,10 +175,11 @@ footer { padding:0 34px 28px 112px; color:#83b7e8; font-size:11px; }
 .portrait-grid button,.logo-grid button { width:58px; height:58px; min-width:58px; }
 @media(max-width:1200px){.metrics{grid-template-columns:repeat(4,1fr)}.dashboard{grid-template-columns:1.2fr 1fr}.dashboard-movers{grid-column:1/-1;border-top:1px solid var(--line)}}
 @media(max-width:1000px){.workspace{grid-template-columns:220px 1fr}.trade-panel{grid-column:1/-1}.lower-grid{grid-template-columns:1fr}.institution-list,#market-ripples,.progression-list{grid-template-columns:1fr 1fr}.operations-grid,.finance-grid,.reports-grid,.options-grid,.empire-grid{grid-template-columns:1fr 1fr}.management-note{grid-column:1/-1}}
-@media(max-width:1000px){.guide-grid{grid-template-columns:1fr 1fr}.guide-detail{grid-column:1/-1}}
+@media(max-width:1000px){.guide-grid{grid-template-columns:1fr 1fr}.guide-detail{grid-column:1/-1}.firm-topbar{grid-template-columns:1fr}.firm-product-slots{grid-template-columns:1fr 1fr}.firm-info{position:relative;right:auto;bottom:auto;width:auto;margin:190px 12px 12px}.firm-building{left:24%;}}
 @media(max-width:700px){header{align-items:start;border-radius:0 0 18px 18px}.clock{flex-direction:column;align-items:end}.city-silhouette,.command-rail{display:none}.dashboard{grid-template-columns:1fr}.dashboard>div{border-right:0;border-bottom:1px solid var(--line)}.allocation-wrap{grid-template-columns:110px 1fr}.allocation-ring{width:105px}.metrics{grid-template-columns:1fr 1fr}.market-heatmap{grid-template-columns:1fr 1fr}.heatmap-tile{grid-column:span 1!important}.economy-kpis,.objective-list{grid-template-columns:1fr 1fr}.advisor{align-items:stretch;flex-direction:column}.advisor-actions span{text-align:left}.workspace{grid-template-columns:1fr}.market-panel{max-height:300px;overflow:auto}.fundamentals{grid-template-columns:1fr 1fr}.lower-grid{grid-template-columns:1fr}main,header,footer{padding-left:14px;padding-right:14px}.launch-card{grid-template-columns:1fr}.launch-art{min-height:220px;border-radius:14px 14px 0 0}.cloud-panel,.founder-setup{grid-template-columns:1fr}.tutorial-overlay{inset:auto 8px 45px 8px;width:auto}.status-console{grid-template-columns:1fr}.status-values{overflow:auto}.status-values span,.status-values button{padding:5px 8px}.status-news{display:none}}
 @media(max-width:700px){.operations-grid,.decision-controls,.finance-grid,.finance-actions,.takeover-targets,.product-list,.reports-grid,.options-grid,.institution-list,#market-ripples,.progression-list,.empire-grid,.facility-list{grid-template-columns:1fr}.management-note{grid-column:auto}.option-position{grid-template-columns:1fr 1fr}.option-position span{text-align:left!important}.institution-trade{grid-template-columns:45px 1fr}.institution-trade span:nth-child(3),.institution-trade span:last-child{text-align:left}}
 @media(max-width:700px){.guide-grid,.guide-flow,.guide-stats{grid-template-columns:1fr}.guide-flow i{height:18px;width:6px;margin:auto}.guide-card-main{grid-template-columns:72px 1fr}.guide-product-art{height:68px}.guide-list{max-height:240px}}
+@media(max-width:700px){.firm-product-slots{grid-template-columns:1fr}.firm-slot{grid-template-columns:84px 1fr 14px}.firm-map{min-height:390px}.firm-building{left:18%;top:16%;width:210px;height:120px}.firm-actions{grid-template-columns:1fr}.firm-mini-kpis{grid-template-columns:1fr}}
 
 .founder-setup .portrait-grid,.founder-setup .logo-grid { grid-template-columns:repeat(5,58px); grid-auto-rows:58px; width:100%; max-width:100%; overflow-x:auto; overflow-y:hidden; padding:0 4px 10px 0; scrollbar-color:#9cc9ff #08285c; scrollbar-width:thin; }
 .founder-setup .portrait-grid::-webkit-scrollbar,.founder-setup .logo-grid::-webkit-scrollbar { height:10px; }
