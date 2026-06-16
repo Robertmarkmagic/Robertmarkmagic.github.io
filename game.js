@@ -51,6 +51,7 @@ function createAiFunds() {
 
 const state = {
   day:1, cash:100000, startWorth:100000, selected:0, side:"buy", orderType:"market",
+  mode:"guided",
   holdings:{}, averageCost:{}, news:[], openOrders:[], ledger:[],
   economy:{interestRate:.04,inflation:.025,confidence:100,growth:.022,fuelIndex:100,regime:"Steady expansion"},
   difficulty:"normal", gameOver:false, takeoverNotice:"No active takeover campaign", selectedProduct:0,
@@ -60,9 +61,11 @@ const state = {
   player:{name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"},
   facilities:[],
   selectedFacilityId:null,
+  missions:{completed:[], profitableDays:0, lastProfitDay:0, priceAdjusted:false, productionAdjusted:false, marketingAdjusted:false, researchAdjusted:false},
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
+const MODE_KEY="market-foundry-mode";
 const TRADING_DAYS_PER_YEAR=240;
 const CAMPAIGN_YEARS=10;
 const CAMPAIGN_DAYS=TRADING_DAYS_PER_YEAR*CAMPAIGN_YEARS;
@@ -134,7 +137,19 @@ const progressionMilestones = [
   {id:"ma",name:"Deal Maker",description:"Strategic stakes and corporate takeovers",worth:145000,day:90}
 ];
 
+const learningMissions = [
+  {id:"save-nova",title:"Save Nova Devices",description:"Survive the first week, keep company cash positive, and produce at least one profitable operating day.",reward:"Unlock pricing and demand training.",unlock:"Dashboard + Operations + Advisor"},
+  {id:"right-price",title:"Find the Right Price",description:"Move the product price and create healthy customer demand without drowning Nova in inventory.",reward:"Unlock production control training.",unlock:"Operations deep dive"},
+  {id:"control-production",title:"Control Production",description:"Adjust daily production so inventory is useful, not wasteful. You want stock available, but not a warehouse full of dead cash.",reward:"Unlock marketing training.",unlock:"Production discipline"},
+  {id:"smart-marketing",title:"Market Without Burning Cash",description:"Use marketing to lift demand while keeping Nova profitable. Good growth should not bankrupt the company.",reward:"Unlock financial reports.",unlock:"Reports"},
+  {id:"first-report",title:"Read Your First Report",description:"Review the business pulse: revenue, cost, profit, cash, inventory, demand, satisfaction, and brand strength.",reward:"Unlock the stock market and your first trade.",unlock:"Market + Trading + Portfolio"},
+  {id:"unlock-market",title:"Unlock the Market",description:"Buy one listed stock so you can see how a portfolio moves beside your operating business.",reward:"Unlock supply chain construction.",unlock:"Empire"},
+  {id:"supply-chain",title:"Build Your First Supply Chain",description:"Build a facility or improve one. Learn how inputs, output, capacity, and marketing create an operating business.",reward:"Unlock empire expansion.",unlock:"Founder Empire"},
+  {id:"build-empire",title:"Build Your Empire",description:"Run at least two active business assets: a second facility, a second product line, or a larger upgraded operation.",reward:"Unlock advanced finance and deal systems.",unlock:"Finance + Options + M&A"}
+];
+
 function featureUnlocked(id) {
+  if (state.mode==="expert") return true;
   const milestone=progressionMilestones.find(item=>item.id===id);
   return !milestone || state.day>=milestone.day || accountEquity()>=milestone.worth;
 }
@@ -332,11 +347,13 @@ function nextTutorialStep() {
 }
 
 function ensureStateDefaults() {
+  if (!state.mode) state.mode="guided";
   if (!state.player) state.player={name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"};
   if (!Array.isArray(state.facilities)) state.facilities=[];
   if (!state.selectedFacilityId && state.facilities[0]) state.selectedFacilityId=state.facilities[0].id;
   if (state.selectedFacilityId && !state.facilities.some(f=>f.id===state.selectedFacilityId)) state.selectedFacilityId=state.facilities[0]?.id || null;
   if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
+  ensureMissionDefaults();
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
 }
 
@@ -388,6 +405,7 @@ function advanceDay(renderAfter=true) {
   updateTakeoverMarket();
   runFacilities();
   runPlayerCompany(companies[0]);
+  updateMissionProgress();
   companies.forEach(c => {
     c.previous=c.price;
     if (c.ticker!=="NOVA") updateAiCompany(c);
@@ -683,6 +701,7 @@ function applySavePayload(payload, label="Saved game loaded.") {
     if (!Array.isArray(state.equityHistory)) state.equityHistory=[accountEquity()];
     if (!Number.isFinite(state.dayStartEquity)) state.dayStartEquity=accountEquity();
     ensureStateDefaults();
+    localStorage.setItem(MODE_KEY,state.mode);
     companies.forEach(c=>{if(!c.book)c.book={bids:[],asks:[]};seedBook(c);});
   document.querySelector("#difficulty").value=state.difficulty;
   document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); message(label,true); render(); return true;
@@ -692,6 +711,7 @@ function saveGame() {
   try {
     const payload=makeSavePayload();
     localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+    localStorage.setItem(MODE_KEY,state.mode);
     addLedger("Game saved",0);
     render();
     message(`Game saved locally at ${new Date(payload.savedAt).toLocaleTimeString()}.`,true);
@@ -894,8 +914,12 @@ async function cloudLoadGame() {
   }
 }
 
-function newGame(startTutorial=false) {
+function newGame(startTutorial=false, mode="guided") {
   restoreArray(companies,initialCompanies); restoreObject(state,initialState); orderId=0;
+  state.mode=mode;
+  localStorage.setItem(MODE_KEY,state.mode);
+  ensureMissionDefaults();
+  if (mode==="expert") state.missions.completed=learningMissions.map(mission=>mission.id);
   state.player={
     name:(document.querySelector("#founder-name")?.value||"Founder").trim()||"Founder",
     companyName:(document.querySelector("#founder-company")?.value||"Nova Devices").trim()||"Nova Devices",
@@ -906,9 +930,9 @@ function newGame(startTutorial=false) {
   companies[0].founderShares=750000;
   state.difficulty=document.querySelector("#difficulty").value;
   const settings=difficultySettings(); companies[0].unitCost*=settings.costMultiplier; companies[0].products.forEach(p=>p.unitCost*=settings.costMultiplier); companies.forEach(c=>c.volatility*=settings.volatility);
-  companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message("New campaign started. Your first task: review Nova Core and place a small trade.",true);
+  companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message(mode==="expert"?"Expert campaign started. Every system is unlocked.":"Guided campaign started. First task: save Nova Devices and learn the business step by step.",true);
   playCue("win");
-  if (startTutorial) beginTutorial();
+  if (startTutorial && mode!=="expert") beginTutorial();
 }
 
 function restoreArray(target,source) { target.splice(0,target.length,...JSON.parse(JSON.stringify(source))); }
@@ -1190,6 +1214,7 @@ function applyManagementDecisions() {
   company.research=+document.querySelector("#research").value;
   company.pendingDecisions=null;
   addLedger(`Updated ${product.name} strategy`,0);
+  evaluateMissions();
   playCue("order");
   render();
   const button=document.querySelector("#apply-decisions"), feedback=document.querySelector("#management-feedback");
@@ -1220,6 +1245,135 @@ function portfolioValue(){ return stockPortfolioValue()+optionsPortfolioValue();
 function accountEquity(){ return state.cash+portfolioValue(); }
 function pct(value){ return `${value>=0?"+":""}${(value*100).toFixed(2)}%`; }
 function message(text,good){ const el=document.querySelector("#trade-message"); el.textContent=text; el.className=good?"up":"down"; }
+
+function ensureMissionDefaults() {
+  if (!state.mode) state.mode="guided";
+  if (!state.missions) state.missions={};
+  if (!Array.isArray(state.missions.completed)) state.missions.completed=[];
+  state.missions.profitableDays=state.missions.profitableDays||0;
+  state.missions.lastProfitDay=state.missions.lastProfitDay||0;
+  ["priceAdjusted","productionAdjusted","marketingAdjusted","researchAdjusted"].forEach(key=>state.missions[key]=Boolean(state.missions[key]));
+}
+
+function currentMission() {
+  ensureMissionDefaults();
+  return learningMissions.find(mission=>!state.missions.completed.includes(mission.id)) || null;
+}
+
+function businessSignals() {
+  const c=companies[0], active=c.products.filter(p=>p.active);
+  const potential=active.reduce((sum,p)=>sum+p.marketPotential,0)||1;
+  const activeProduction=active.reduce((sum,p)=>sum+p.production,0)||1;
+  const demand=Math.max(0,Math.min(1.4,c.dailySales/potential));
+  const inventoryDays=c.dailySales>0?c.inventory/c.dailySales:c.inventory/activeProduction;
+  const satisfaction=Math.max(0,Math.min(100,Math.round(62+demand*30-Math.max(0,inventoryDays-5)*5+(c.dailyOperatingProfit>=0?8:-12))));
+  const brand=Math.max(0,Math.min(100,Math.round(c.quality*42+Math.sqrt(active.reduce((sum,p)=>sum+p.marketing,0))*3)));
+  const bottleneck=facilityBottleneck();
+  return {demand,satisfaction,brand,inventoryDays,bottleneck};
+}
+
+function facilityBottleneck() {
+  const factories=state.facilities.filter(f=>facilityRole(f.type)==="factory").reduce((sum,f)=>sum+f.capacity*f.level,0);
+  const stores=state.facilities.filter(f=>facilityRole(f.type)==="store").reduce((sum,f)=>sum+f.capacity*f.level,0);
+  if (!factories && !stores) return "No supply chain built yet.";
+  if (factories>stores*1.25) return "Factory output is higher than retail capacity.";
+  if (stores>factories*1.25) return "Retail capacity is waiting for more production.";
+  return "Supply chain capacity is balanced.";
+}
+
+function missionObjectives(mission) {
+  const c=companies[0], signals=businessSignals();
+  const healthyInventory=c.inventory>250 && c.inventory<9000;
+  const hasStock=Object.values(state.holdings||{}).some(qty=>qty>0);
+  const hasFacility=state.facilities.length>0;
+  const hasEmpireScale=state.facilities.length>=2 || c.products.filter(p=>p.active).length>=2 || state.facilities.some(f=>f.level>=2);
+  const map={
+    "save-nova":[["Survive 7 days",state.day>=8],["Company cash above $0",c.companyCash>0],["At least 1 profitable day",state.missions.profitableDays>=1]],
+    "right-price":[["Change product price",state.missions.priceAdjusted],["Reach 60% customer demand",signals.demand>=.6],["Avoid excessive inventory",healthyInventory]],
+    "control-production":[["Change production",state.missions.productionAdjusted],["Keep inventory healthy",healthyInventory],["Sell at least 500 units/day",c.dailySales>=500]],
+    "smart-marketing":[["Change marketing budget",state.missions.marketingAdjusted],["Demand at 60% or better",signals.demand>=.6],["Daily profit is positive",c.dailyOperatingProfit>0]],
+    "first-report":[["Review business pulse",state.day>=10],["Know your cash",c.companyCash>0],["Know satisfaction/brand",signals.satisfaction>=50 && signals.brand>=40]],
+    "unlock-market":[["Market is unlocked",screenUnlocked("market")],["Buy one stock",hasStock],["Portfolio has value",portfolioValue()>0]],
+    "supply-chain":[["Build one facility",hasFacility],["See input/output guide",hasFacility],["Supply chain has capacity",hasFacility && state.facilities.some(f=>f.capacity>0)]],
+    "build-empire":[["Operate two assets or upgrade one",hasEmpireScale],["Nova still solvent",c.companyCash>0],["Founder keeps control",hasControl()]]
+  };
+  return map[mission.id] || [];
+}
+
+function missionComplete(mission) {
+  return missionObjectives(mission).every(item=>item[1]);
+}
+
+function evaluateMissions() {
+  ensureMissionDefaults();
+  if (state.mode==="expert") return;
+  let mission=currentMission();
+  while (mission && missionComplete(mission)) {
+    state.missions.completed.push(mission.id);
+    addLedger(`Mission complete: ${mission.title}`,0);
+    state.news.unshift({day:state.day,ticker:"ADVISOR",impact:.01,text:`Mission complete: ${mission.title}. ${mission.reward}`});
+    state.news=state.news.slice(0,6);
+    mission=currentMission();
+  }
+}
+
+function updateMissionProgress() {
+  ensureMissionDefaults();
+  const c=companies[0];
+  if (c.dailyOperatingProfit>0 && state.missions.lastProfitDay!==state.day) {
+    state.missions.profitableDays++;
+    state.missions.lastProfitDay=state.day;
+  }
+  evaluateMissions();
+}
+
+function screenUnlocked(screen) {
+  if (state.mode==="expert") return true;
+  ensureMissionDefaults();
+  const done=id=>state.missions.completed.includes(id);
+  if (["dashboard","operations","advisor","settings"].includes(screen)) return true;
+  if (["reports"].includes(screen)) return done("smart-marketing");
+  if (["market","trading","portfolio","institutions"].includes(screen)) return done("first-report");
+  if (["empire","supply"].includes(screen)) return done("unlock-market");
+  if (["finance","options","deals"].includes(screen)) return done("build-empire");
+  return true;
+}
+
+function lockSection(selector, screen, messageText) {
+  const el=document.querySelector(selector);
+  if (!el) return;
+  const locked=!screenUnlocked(screen);
+  el.classList.toggle("locked-panel",locked);
+  if (locked) el.dataset.lockMessage=messageText;
+  else delete el.dataset.lockMessage;
+}
+
+function renderModeLocks() {
+  lockSection("#market","market","Locked in Guided Mode: finish 'Read Your First Report' to open the market.");
+  lockSection("#trading","trading","Locked in Guided Mode: finish the report mission before trading.");
+  lockSection("#portfolio-section","portfolio","Locked in Guided Mode: buy your first stock after the market opens.");
+  lockSection(".institutions","institutions","Locked in Guided Mode: institutional traders unlock with the market.");
+  lockSection(".financial-reports","reports","Locked in Guided Mode: complete marketing training to open reports.");
+  lockSection("#empire","empire","Locked in Guided Mode: buy one stock, then build your first supply chain.");
+  lockSection("#finance","finance","Locked in Guided Mode: build your empire before advanced corporate finance.");
+  lockSection(".options","options","Locked in Guided Mode: complete beginner missions or use Expert Mode.");
+  lockSection("#deals","deals","Locked in Guided Mode: complete beginner missions before M&A.");
+}
+
+function markMissionInput(id) {
+  ensureMissionDefaults();
+  if (id==="product-price") state.missions.priceAdjusted=true;
+  if (id==="production") state.missions.productionAdjusted=true;
+  if (id==="marketing") state.missions.marketingAdjusted=true;
+  if (id==="research") state.missions.researchAdjusted=true;
+  evaluateMissions();
+}
+
+function startExpertMode(startTutorial=false) {
+  if (!window.confirm("Expert mode unlocks the full game immediately. Recommended only if you already understand business simulations.")) return;
+  newGame(startTutorial,"expert");
+  message("Expert Mode enabled. All systems are unlocked from the start.",true);
+}
 
 function selectCompany(index) {
   state.selected=(index+companies.length)%companies.length;
@@ -1323,6 +1477,36 @@ function renderDashboard(worth,investments) {
   document.querySelector("#margin-used").textContent=money.format(shortExposure);
   document.querySelector("#trades-today").textContent=state.ledger.filter(item=>item.day===state.day&&/^(Bought|Sold)/.test(item.text)).length;
   document.querySelector("#orders-count").textContent=state.openOrders.length;
+  renderMissionDashboard();
+}
+
+function renderMissionDashboard() {
+  ensureMissionDefaults();
+  const mission=currentMission(), signals=businessSignals(), c=companies[0];
+  document.querySelector("#mission-kicker").textContent=state.mode==="expert"?"EXPERT MODE":"GUIDED MODE";
+  if (!mission || state.mode==="expert") {
+    document.querySelector("#mission-title").textContent=state.mode==="expert"?"Full command unlocked":"Beginner path complete";
+    document.querySelector("#mission-description").textContent=state.mode==="expert"
+      ? "All screens are available. Beginner missions are optional reference goals, while the advisor focuses on capital structure, bottlenecks, margins, and portfolio risk."
+      : "You have completed the guided business path. Keep building toward the ten-year empire objectives.";
+    const optional=learningMissions.slice(0,4).map(m=>`<div class="mission-objective optional"><span>${m.title}</span><strong>Optional</strong></div>`).join("");
+    document.querySelector("#mission-objectives").innerHTML=optional;
+  } else {
+    const number=learningMissions.findIndex(item=>item.id===mission.id)+1;
+    document.querySelector("#mission-title").textContent=`Mission ${number}: ${mission.title}`;
+    document.querySelector("#mission-description").textContent=`${mission.description} Reward: ${mission.reward}`;
+    document.querySelector("#mission-objectives").innerHTML=missionObjectives(mission).map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("");
+  }
+  document.querySelector("#mission-report").innerHTML=[
+    ["Cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0],
+    ["Revenue",`$${c.dailyRevenue.toFixed(2)}m`,c.dailyRevenue>0],
+    ["Profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
+    ["Inventory",c.inventory.toLocaleString(),c.inventory<9000],
+    ["Demand",`${Math.round(signals.demand*100)}%`,signals.demand>=.6],
+    ["Satisfaction",`${signals.satisfaction}/100`,signals.satisfaction>=60],
+    ["Brand",`${signals.brand}/100`,signals.brand>=50],
+    ["Mode",state.mode==="expert"?"Expert":"Guided",true]
+  ].map(item=>`<div><span>${item[0]}</span><strong class="${item[2]?"up":"down"}">${item[1]}</strong></div>`).join("");
 }
 
 function renderMarketOverview() {
@@ -1387,7 +1571,7 @@ function render() {
     ? `<div class="portfolio-row"><span>Company</span><span>Position</span><span>Value</span><span>P/L</span></div>`+ownedCompanies.map(c=>{const h=state.holdings[c.ticker],pl=(c.price-state.averageCost[c.ticker])*h;return `<div class="portfolio-row"><span><strong>${c.ticker}</strong> ${c.name}</span><span>${h>0?`${h} long`:`${Math.abs(h)} short`}</span><span>${money.format(h*c.price)}</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span></div>`}).join("")
     : `<p style="padding:20px;color:var(--muted)">Your portfolio is empty. Choose a company and place your first order.</p>`;
   document.querySelector("#news").innerHTML=state.news.length?state.news.map(n=>`<div class="news-item"><time>DAY ${n.day} &middot; ${n.ticker}</time><p>${n.text} <strong class="${n.impact>=0?"up":"down"}">${pct(n.impact)}</strong></p></div>`).join(""):`<p style="padding:20px 4px;color:var(--muted)">No major news yet. Run the next day to move the market.</p>`;
-  renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFacilities(); renderFinance(); renderTakeovers(); updateEstimate(); renderChart(company);
+  renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFacilities(); renderFinance(); renderTakeovers(); renderModeLocks(); updateEstimate(); renderChart(company);
 }
 
 function renderProgression() {
@@ -1493,9 +1677,38 @@ const advisorTips=[
   {title:"Win the Ten Year Empire",text:"By the end of year 10, meet the net-worth and market-share targets, keep Nova solvent, and protect voting control. Use +1 week or +1 month once your operating decisions are stable."}
 ];
 
+function expertAdvisorTip() {
+  const c=companies[0], signals=businessSignals(), sectorValues={};
+  companies.forEach(company=>{const value=Math.abs((state.holdings[company.ticker]||0)*company.price); sectorValues[company.sector]=(sectorValues[company.sector]||0)+value;});
+  const portfolio=portfolioValue(), largestSector=Math.max(0,...Object.values(sectorValues));
+  if (c.bondDebt>20 && c.dailyOperatingProfit*240<c.bondDebt*c.bondRate*1.5) return {title:"Capital structure warning",text:"Your capital structure is becoming risky because debt is rising faster than operating profit. Protect cash before adding more bonds."};
+  if (signals.bottleneck.includes("higher than retail")) return {title:"Supply chain bottleneck",text:"Your supply chain has a bottleneck. Factory output is higher than retail capacity, so expansion may trap cash in inventory."};
+  if (portfolio>0 && largestSector/portfolio>.65) return {title:"Portfolio concentration",text:"Your portfolio is overexposed to one market sector. A sector shock could hit both price and liquidity at the same time."};
+  if (c.companyCash<6 && c.totalShares<1000000) return {title:"Buyback trade-off",text:"Your buyback improved earnings per share, but reduced available cash. Watch liquidity before the next expansion."};
+  if (c.dailyRevenue>0 && c.dailyOperatingProfit/c.dailyRevenue<.08) return {title:"Margin pressure",text:"Your expansion is increasing revenue, but margins are falling. Recheck pricing, production cost, and discretionary budgets."};
+  return {title:"Expert operating brief",text:`${signals.bottleneck} Demand is ${Math.round(signals.demand*100)}%, satisfaction is ${signals.satisfaction}/100, and brand strength is ${signals.brand}/100.`};
+}
+
 function renderAdvisor() {
   const panel=document.querySelector("#advisor");
   panel.classList.toggle("hidden",state.advisorHidden);
+  if (state.mode==="expert") {
+    const tip=expertAdvisorTip();
+    document.querySelector("#advisor-title").textContent=tip.title;
+    document.querySelector("#advisor-text").textContent=tip.text;
+    document.querySelector("#advisor-progress").textContent="Expert Mode";
+    document.querySelector("#advisor-next").textContent="Refresh brief";
+    return;
+  }
+  const mission=currentMission();
+  if (mission) {
+    const number=learningMissions.findIndex(item=>item.id===mission.id)+1;
+    document.querySelector("#advisor-title").textContent=mission.title;
+    document.querySelector("#advisor-text").textContent=`Mission ${number} focus: ${mission.description}`;
+    document.querySelector("#advisor-progress").textContent=`Guided Mode - ${number} of ${learningMissions.length}`;
+    document.querySelector("#advisor-next").textContent="Next tip";
+    return;
+  }
   const tip=advisorTips[Math.min(state.advisorStep,advisorTips.length-1)];
   document.querySelector("#advisor-title").textContent=tip.title;
   document.querySelector("#advisor-text").textContent=tip.text;
@@ -1504,6 +1717,7 @@ function renderAdvisor() {
 }
 
 function nextAdvisorTip() {
+  if (state.mode==="expert") return render();
   if (state.advisorStep>=advisorTips.length-1) state.advisorHidden=true;
   else state.advisorStep++;
   render();
@@ -1857,6 +2071,14 @@ function updateEstimate(){
   document.querySelector("#trade").textContent=`${state.side==="buy"?"Buy":"Sell"} ${qty||""} shares`;
 }
 
+function bootstrapSavedMode() {
+  if (localStorage.getItem(MODE_KEY)==="expert") {
+    state.mode="expert";
+    ensureMissionDefaults();
+    state.missions.completed=learningMissions.map(mission=>mission.id);
+  }
+}
+
 companies.forEach(seedBook);
 document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelector("#next-week").onclick=()=>runDays(5); document.querySelector("#next-month").onclick=()=>runDays(20);
 document.querySelector("#audio-toggle").onclick=toggleAudio;
@@ -1870,6 +2092,7 @@ document.querySelector("#save-game").onclick=saveGame; document.querySelector("#
 document.querySelector("#cloud-save").onclick=cloudSaveGame; document.querySelector("#cloud-load").onclick=cloudLoadGame;
 document.querySelector("#auth-sign-up").onclick=signUp; document.querySelector("#auth-sign-in").onclick=signIn; document.querySelector("#auth-resend").onclick=resendConfirmation; document.querySelector("#auth-reset").onclick=resetPassword; document.querySelector("#auth-sign-out").onclick=signOut;
 document.querySelector("#launch-start").onclick=()=>newGame(true);
+document.querySelector("#launch-expert").onclick=()=>startExpertMode(false);
 document.querySelector("#launch-load").onclick=()=>loadGame();
 document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
 document.querySelector("#tutorial-next").onclick=nextTutorialStep;
@@ -1895,9 +2118,9 @@ document.querySelectorAll("[data-quick-size]").forEach(button=>button.onclick=()
 });
 document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
 [...document.querySelectorAll("[data-finance-action]")].forEach(button=>button.onclick=()=>corporateFinanceAction(button.dataset.financeAction));
-["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>refreshDecisionLabels());
+["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>{markMissionInput(id);refreshDecisionLabels();});
 window.addEventListener("keydown",handleKeyboard);
 setupTouchControls();
-window.addEventListener("resize",()=>renderChart(companies[state.selected])); render();
+window.addEventListener("resize",()=>renderChart(companies[state.selected])); bootstrapSavedMode(); render();
 initCloud();
 requestAnimationFrame(gameLoop);
