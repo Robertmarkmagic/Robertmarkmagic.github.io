@@ -241,7 +241,7 @@
 
   <div id="launch-modal" class="modal launch-modal" role="dialog" aria-modal="true">
     <div class="launch-card">
-      <div class="launch-art" role="img" aria-label="Animated corporate city command map"><div class="city-grid-art"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="launch-art"><img src="assets/corporate-city.png" alt="Corporate city district"></div>
       <div class="launch-copy">
         <p class="eyebrow">WELCOME TO THE BOARDROOM</p>
         <h2>Build Your Market Empire</h2>
@@ -250,10 +250,10 @@
           <strong>Founder setup</strong>
           <label>Your name<input id="founder-name" maxlength="24" value="Founder"></label>
           <label>Company name<input id="founder-company" maxlength="32" value="Nova Devices"></label>
-          <div><span>Choose face</span><div class="choice-row" id="avatar-choices"><button data-avatar="founder-a" class="active"><i class="avatar-chip founder-a"></i></button><button data-avatar="founder-b"><i class="avatar-chip founder-b"></i></button><button data-avatar="founder-c"><i class="avatar-chip founder-c"></i></button></div></div>
-          <div><span>Choose logo</span><div class="choice-row" id="logo-choices"><button data-logo="logo-a" class="active"><i class="logo-chip logo-a"></i></button><button data-logo="logo-b"><i class="logo-chip logo-b"></i></button><button data-logo="logo-c"><i class="logo-chip logo-c"></i></button></div></div>
+          <div><span>Choose face</span><div class="choice-row portrait-grid" id="avatar-choices"><button data-avatar="founder-a" class="active"><i class="avatar-chip founder-a"></i></button><button data-avatar="founder-b"><i class="avatar-chip founder-b"></i></button><button data-avatar="founder-c"><i class="avatar-chip founder-c"></i></button><button data-avatar="founder-d"><i class="avatar-chip founder-d"></i></button><button data-avatar="founder-e"><i class="avatar-chip founder-e"></i></button><button data-avatar="founder-f"><i class="avatar-chip founder-f"></i></button><button data-avatar="founder-g"><i class="avatar-chip founder-g"></i></button><button data-avatar="founder-h"><i class="avatar-chip founder-h"></i></button><button data-avatar="founder-i"><i class="avatar-chip founder-i"></i></button><button data-avatar="founder-j"><i class="avatar-chip founder-j"></i></button></div></div>
+          <div><span>Choose logo</span><div class="choice-row logo-grid" id="logo-choices"><button data-logo="logo-a" class="active"><i class="logo-chip logo-a"></i></button><button data-logo="logo-b"><i class="logo-chip logo-b"></i></button><button data-logo="logo-c"><i class="logo-chip logo-c"></i></button><button data-logo="logo-d"><i class="logo-chip logo-d"></i></button><button data-logo="logo-e"><i class="logo-chip logo-e"></i></button><button data-logo="logo-f"><i class="logo-chip logo-f"></i></button><button data-logo="logo-g"><i class="logo-chip logo-g"></i></button><button data-logo="logo-h"><i class="logo-chip logo-h"></i></button><button data-logo="logo-i"><i class="logo-chip logo-i"></i></button><button data-logo="logo-j"><i class="logo-chip logo-j"></i></button></div></div>
         </div>
-        <div class="launch-advisor"><div class="advisor-avatar" role="img" aria-label="Executive advisor portrait"></div><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
+        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
         <div class="cloud-panel" aria-label="Cloud account">
           <div><strong>Cloud account</strong><span id="cloud-status">Setup required: add your Supabase URL and anon key to enable email signup.</span></div>
           <label>Email<input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
@@ -267,7 +267,7 @@
 
   <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-live="polite">
     <div class="tutorial-card">
-      <div class="advisor-avatar" role="img" aria-label="Executive advisor portrait"></div>
+      <img src="assets/executive-advisor.png" alt="Executive advisor">
       <div><p class="eyebrow" id="tutorial-kicker"></p><h2 id="tutorial-title"></h2><p id="tutorial-text"></p></div>
       <div class="tutorial-actions"><button id="tutorial-skip">Skip tutorial</button><button id="tutorial-next" class="primary">Next</button></div>
     </div>
