@@ -1047,13 +1047,19 @@ function applyManagementDecisions() {
   Object.assign(product,decisions);
   company.research=+document.querySelector("#research").value;
   company.pendingDecisions=null;
+  addLedger(`Updated ${product.name} strategy`,0);
+  playCue("order");
+  render();
+  const button=document.querySelector("#apply-decisions"), feedback=document.querySelector("#management-feedback");
   document.querySelector("#operations-status").textContent="Decisions applied";
   document.querySelector("#management-advice").textContent="Management decisions are active now. Advance time to see the sales and profit impact.";
   document.querySelector("#status-headline").textContent=`${product.name} strategy updated: price ${money.format(product.price)}, production ${product.production.toLocaleString()} units.`;
-  addLedger(`Updated ${product.name} strategy`,0);
   message("Management decisions applied. Advance time to see the new results.",true);
-  playCue("order");
-  render();
+  button.textContent="Applied - run time to see result";
+  button.classList.add("applied");
+  feedback?.classList.add("flash");
+  renderManagementPreview(true);
+  setTimeout(()=>{button.classList.remove("applied"); feedback?.classList.remove("flash"); button.textContent="Apply management decisions";},1800);
 }
 
 function launchProduct(index) {
@@ -1436,7 +1442,57 @@ function renderOperations() {
   else if(c.companyCash<5) advice="Cash is tight. Protect liquidity before funding aggressive growth.";
   document.querySelector("#management-advice").textContent=advice;
   document.querySelector("#apply-decisions").disabled=!hasControl();
+  renderManagementPreview(false);
   renderProducts();
+}
+
+function managementInputs() {
+  return {
+    price:+document.querySelector("#product-price").value,
+    production:+document.querySelector("#production").value,
+    marketing:+document.querySelector("#marketing").value,
+    research:+document.querySelector("#research").value
+  };
+}
+
+function estimateManagementImpact(product, inputs) {
+  const c=companies[0], activeCount=Math.max(1,c.products.filter(p=>p.active).length);
+  const macroDemand=Math.max(.55,Math.min(1.35,state.economy.confidence/100*(1+(state.economy.growth-.02)*3)));
+  const relativePrice=product.competitorPrice/Math.max(1,inputs.price);
+  const priceAppeal=Math.max(.3,Math.min(1.8,relativePrice**1.35));
+  const marketingLift=1+Math.sqrt(inputs.marketing/100)*.16;
+  const qualityLift=Math.max(.65,.65+product.quality*.35);
+  const demand=Math.max(80,Math.round(product.marketPotential*priceAppeal*marketingLift*qualityLift*macroDemand));
+  const produced=Math.min(inputs.production,Math.max(0,Math.floor((c.companyCash*1000000)/(product.unitCost||1))));
+  const available=product.inventory+produced;
+  const sold=Math.min(available,demand);
+  const revenue=sold*inputs.price/1000000;
+  const cost=produced*product.unitCost/1000000+(inputs.marketing+inputs.research/activeCount)/1000;
+  const profit=revenue-cost;
+  const endingInventory=available-sold;
+  const qualityGain=inputs.research/12000;
+  return {demand,produced,sold,profit,endingInventory,qualityGain};
+}
+
+function renderManagementPreview(applied=false) {
+  const box=document.querySelector("#management-feedback");
+  if (!box) return;
+  const c=companies[0], product=c.products[state.selectedProduct] || c.products.find(item=>item.active);
+  if (!product) { box.innerHTML=""; return; }
+  const inputs=managementInputs(), estimate=estimateManagementImpact(product,inputs);
+  const demandWidth=Math.min(100,Math.round(estimate.demand/product.marketPotential*70));
+  const productionWidth=Math.min(100,Math.round(estimate.produced/Math.max(1,inputs.production)*100));
+  const profitWidth=Math.max(4,Math.min(100,Math.round((estimate.profit+1)*35)));
+  const inventoryWidth=Math.min(100,Math.round(estimate.endingInventory/Math.max(1,product.marketPotential*8)*100));
+  const profitClass=estimate.profit>=0?"up":"down";
+  box.innerHTML=`<h3>${applied?"Applied strategy":"Expected next-day impact"}</h3>
+    <div class="impact-grid">
+      <div class="impact-card"><span>Demand forecast<strong>${estimate.demand.toLocaleString()}</strong></span><div class="impact-bar"><i style="--w:${demandWidth}%"></i></div></div>
+      <div class="impact-card"><span>Production plan<strong>${estimate.produced.toLocaleString()}</strong></span><div class="impact-bar"><i style="--w:${productionWidth}%"></i></div></div>
+      <div class="impact-card"><span>Profit estimate<strong class="${profitClass}">${estimate.profit>=0?"+":""}$${estimate.profit.toFixed(2)}m</strong></span><div class="impact-bar"><i style="--w:${profitWidth}%"></i></div></div>
+      <div class="impact-card"><span>Ending inventory<strong>${estimate.endingInventory.toLocaleString()}</strong></span><div class="impact-bar"><i style="--w:${inventoryWidth}%"></i></div></div>
+    </div>
+    <p class="impact-note">Research adds about +${(estimate.qualityGain*100).toFixed(2)} quality points per day. Advance time to turn this forecast into actual sales.</p>`;
 }
 
 function renderProducts() {
@@ -1526,7 +1582,12 @@ function refreshDecisionLabels(markDirty=true) {
   document.querySelector("#production-value").textContent=`${(+document.querySelector("#production").value).toLocaleString()} units`;
   document.querySelector("#marketing-value").textContent=`$${document.querySelector("#marketing").value}k/day`;
   document.querySelector("#research-value").textContent=`$${document.querySelector("#research").value}k/day`;
-  if(markDirty) document.querySelector("#operations-status").textContent="Unsaved changes";
+  renderManagementPreview(false);
+  if(markDirty) {
+    document.querySelector("#operations-status").textContent="Preview updated";
+    const button=document.querySelector("#apply-decisions");
+    if (button) button.textContent="Apply management decisions";
+  }
 }
 
 function updateEstimate(){
