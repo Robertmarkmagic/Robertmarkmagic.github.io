@@ -685,7 +685,11 @@ function initCloud() {
   const config=cloudConfig();
   if (!window.supabase || !config.url || !config.anonKey) { updateCloudStatus(); return; }
   supabaseClient=window.supabase.createClient(config.url,config.anonKey);
-  supabaseClient.auth.getUser().then(({data})=>{ currentUser=data.user; updateCloudStatus(); });
+  supabaseClient.auth.getUser().then(({data})=>{
+    currentUser=data.user;
+    if (currentUser && location.hash.includes("access_token")) history.replaceState(null,"",location.pathname+location.search);
+    updateCloudStatus();
+  });
   supabaseClient.auth.onAuthStateChange((_event,session)=>{ currentUser=session?session.user:null; updateCloudStatus(); });
 }
 
@@ -700,7 +704,8 @@ async function signUp() {
   if (!supabaseClient) return explainCloudSetup();
   const {email,password}=authFields();
   if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.",false);
-  const {error}=await supabaseClient.auth.signUp({email,password});
+  const redirectTo=new URL(location.pathname || "/",location.origin).href;
+  const {error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
   if (error) return updateCloudStatus(error.message,false);
   updateCloudStatus("Account created. Check your email if confirmation is enabled, then sign in.",true);
 }
