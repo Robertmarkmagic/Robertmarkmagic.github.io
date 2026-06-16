@@ -62,6 +62,9 @@ const state = {
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
+const TRADING_DAYS_PER_YEAR=240;
+const CAMPAIGN_YEARS=10;
+const CAMPAIGN_DAYS=TRADING_DAYS_PER_YEAR*CAMPAIGN_YEARS;
 const initialCompanies=JSON.parse(JSON.stringify(companies));
 const initialState=JSON.parse(JSON.stringify(state));
 let orderId = 0;
@@ -564,9 +567,9 @@ function updateTakeoverMarket() {
 
 function difficultySettings() {
   return {
-    easy:{targetWorth:105000,targetShare:.17,costMultiplier:.92,volatility:.85,label:"Easy"},
-    normal:{targetWorth:115000,targetShare:.20,costMultiplier:1,volatility:1,label:"Normal"},
-    hard:{targetWorth:130000,targetShare:.24,costMultiplier:1.1,volatility:1.2,label:"Hard"}
+    easy:{targetWorth:250000,targetShare:.25,costMultiplier:.92,volatility:.85,label:"Easy"},
+    normal:{targetWorth:500000,targetShare:.35,costMultiplier:1,volatility:1,label:"Normal"},
+    hard:{targetWorth:1000000,targetShare:.45,costMultiplier:1.1,volatility:1.2,label:"Hard"}
   }[state.difficulty];
 }
 
@@ -584,10 +587,10 @@ function checkCampaignState() {
   const c=companies[0];
   if (accountEquity()<=0) return endGame("Personal bankruptcy","Your trading account has no remaining equity.",false);
   if (c.companyCash<=0 && c.dailyOperatingProfit<0 && c.bondDebt>=40) return endGame("Corporate bankruptcy","Nova ran out of cash while carrying unsustainable debt.",false);
-  if (state.day>=240) {
+  if (state.day>=CAMPAIGN_DAYS) {
     const s=difficultySettings();
     const won=accountEquity()>=s.targetWorth&&c.marketShare>=s.targetShare&&c.companyCash>0;
-    endGame(won?"Year One complete":"The board expected more",won?"You built wealth while keeping Nova competitive.":"Nova survived, but one or more campaign objectives were missed.",won);
+    endGame(won?"Ten Year Empire complete":"The board expected more",won?"You built a durable company and a serious fortune over 10 years.":"Nova survived 10 years, but one or more empire objectives were missed.",won);
   }
 }
 
@@ -1206,7 +1209,7 @@ function renderStatusConsole(worth) {
   const profit=worth-state.startWorth,profitEl=document.querySelector("#status-profit");
   profitEl.textContent=money.format(profit);
   profitEl.className=profit>=0?"up":"down";
-  document.querySelector("#status-date").textContent=`DAY ${state.day} / YEAR ${Math.floor((state.day-1)/240)+1}`;
+  document.querySelector("#status-date").textContent=`DAY ${state.day} / YEAR ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}`;
 }
 
 function renderChart(company) {
@@ -1224,7 +1227,7 @@ function render() {
   ensureStateDefaults();
   checkProgression();
   const company=companies[state.selected], investments=portfolioValue(), worth=state.cash+investments, change=(company.price-company.previous)/company.previous;
-  document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/240)+1}, Q${Math.floor(((state.day-1)%240)/60)+1}, Day ${state.day}`;
+  document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}, Q${Math.floor(((state.day-1)%TRADING_DAYS_PER_YEAR)/60)+1}, Day ${state.day}`;
   document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
   document.querySelector("#time-speed").value=String(state.autoTime.speed||1);
   companies[0].name=state.player.companyName||companies[0].name;
@@ -1348,7 +1351,7 @@ const advisorTips=[
   {title:"Choose funding carefully",text:"Bonds preserve ownership but add interest expense. New shares raise cash but dilute voting control and per-share value. Buybacks reverse dilution when Nova has spare cash."},
   {title:"Expand with discipline",text:"Launch Value or Pro only when Nova can fund the launch and keep a cash buffer. Acquisitions add earnings and synergies, but takeover premiums rise as rival boards resist."},
   {title:"Read the economy",text:"Interest rates affect valuations and bond coupons. Confidence drives product demand, inflation raises production costs, and different industries react differently to recessions."},
-  {title:"Win Year One",text:"By day 240, meet the net-worth and market-share targets, keep Nova solvent, and protect voting control. Use +1 week or +1 month only after your operating decisions are stable."}
+  {title:"Win the Ten Year Empire",text:"By the end of year 10, meet the net-worth and market-share targets, keep Nova solvent, and protect voting control. Use +1 week or +1 month once your operating decisions are stable."}
 ];
 
 function renderAdvisor() {
@@ -1368,8 +1371,8 @@ function nextAdvisorTip() {
 }
 
 function renderCampaign() {
-  const c=companies[0], s=difficultySettings(), daysLeft=Math.max(0,240-state.day);
-  document.querySelector("#campaign-status").textContent=state.gameOver?"Campaign ended":`${daysLeft} trading days remaining`;
+  const c=companies[0], s=difficultySettings(), daysLeft=Math.max(0,CAMPAIGN_DAYS-state.day), yearsLeft=Math.floor(daysLeft/TRADING_DAYS_PER_YEAR), remainder=daysLeft%TRADING_DAYS_PER_YEAR;
+  document.querySelector("#campaign-status").textContent=state.gameOver?"Campaign ended":`${yearsLeft}y ${remainder}d remaining`;
   const objectives=[
     ["Personal net worth",money.format(accountEquity()),accountEquity()>=s.targetWorth,`Target ${money.format(s.targetWorth)}`],
     ["Nova market share",pct(c.marketShare),c.marketShare>=s.targetShare,`Target ${pct(s.targetShare)}`],
