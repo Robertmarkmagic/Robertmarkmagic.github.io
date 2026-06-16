@@ -243,3 +243,15 @@ input,select,textarea { font-size:16px; }
   .founder-setup { overflow:visible; }
   .founder-setup .portrait-grid,.founder-setup .logo-grid { grid-template-columns:repeat(5,minmax(52px,1fr)); }
 }
+
+#launch-modal { overflow-y:auto; overflow-x:hidden; }
+#launch-modal .launch-card,#launch-modal .launch-copy,#launch-modal .founder-setup,#launch-modal .launch-advisor,#launch-modal .cloud-panel { max-height:none; overflow:visible; }
+#launch-modal .launch-copy { height:auto; min-height:0; }
+#launch-modal .founder-setup,#launch-modal .launch-advisor,#launch-modal .cloud-panel { flex:0 0 auto; align-self:stretch; }
+#launch-modal .founder-setup .portrait-grid,#launch-modal .founder-setup .logo-grid { overflow:visible!important; padding:0!important; scrollbar-width:none; }
+#launch-modal .founder-setup .portrait-grid::-webkit-scrollbar,#launch-modal .founder-setup .logo-grid::-webkit-scrollbar { display:none; }
+
+@media(max-height:760px) and (min-width:701px){
+  #launch-modal .launch-card { height:auto; min-height:calc(100dvh - 32px); overflow:visible; }
+  #launch-modal .launch-copy { overflow:visible; }
+}
