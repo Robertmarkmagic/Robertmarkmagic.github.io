@@ -2184,6 +2184,28 @@ function recommendedShopType(key) {
   return picks[key] || "store";
 }
 
+const productArt = {
+  clay:["CL","earth"],grain:["GR","field"],fabric:["FA","textile"],components:["CO","tech"],oil:["OI","energy"],beans:["BE","field"],flour:["FL","field"],
+  milk:["MI","fresh"],syrup:["SY","fresh"],chemicals:["CH","lab"],pharma:["PH","lab"],chips:["CP","tech"],steel:["ST","metal"],autoParts:["AP","metal"],
+  cotton:["CT","textile"],leather:["LE","textile"],paper:["PA","paper"],preciousMetals:["PM","luxury"],
+  bricks:["BR","earth"],bread:["BD","fresh"],shirts:["SH","textile"],phones:["PH","tech"],fuel:["FU","energy"],coffee:["CF","fresh"],pastries:["PS","fresh"],
+  cheese:["CH","fresh"],softDrinks:["SD","fresh"],cosmetics:["CO","lab"],medicine:["MD","lab"],computers:["PC","tech"],printers:["PR","tech"],
+  appliances:["AP","metal"],luxuryCars:["LC","vehicle"],motorcycles:["MC","vehicle"],babyClothes:["BA","textile"],leatherJackets:["LJ","textile"],
+  petFood:["PF","fresh"],books:["BK","paper"],jewelry:["JW","luxury"],cleaningGoods:["CG","lab"]
+};
+
+function guideArt(key,label) {
+  const art=productArt[key]||productArt[label?.toLowerCase?.()]||[String(label||key).slice(0,2).toUpperCase(),"general"];
+  return `<div class="guide-product-art guide-art-${art[1]}"><span>${art[0]}</span></div>`;
+}
+
+function guideBuildFacility(type,lineKey) {
+  const typeSelect=document.querySelector("#facility-type"), lineSelect=document.querySelector("#facility-line");
+  if (typeSelect) typeSelect.value=type;
+  if (lineSelect) lineSelect.value=lineKey;
+  buildFacility();
+}
+
 function renderManufacturerGuide() {
   const classList=document.querySelector("#guide-classes"), productList=document.querySelector("#guide-products"), detail=document.querySelector("#guide-detail");
   if (!classList || !productList || !detail) return;
@@ -2198,15 +2220,15 @@ function renderManufacturerGuide() {
   productList.innerHTML=group.items.map(key=>`<button class="${key===guideState.product?"active":""}" data-guide-product="${key}"><span>${productLines[key].name}</span><small>${productLines[key].input} -> ${productLines[key].output}</small></button>`).join("");
   detail.innerHTML=`<div class="guide-recipe-card">
     <div class="guide-card-main">
-      <div class="guide-product-art"><span>${line.name.slice(0,2).toUpperCase()}</span></div>
+      ${guideArt(guideState.product,line.name)}
       <div><p class="eyebrow">MANUFACTURER'S GUIDE</p><h3>${line.name}</h3><span>${group.name}</span></div>
     </div>
     <div class="guide-flow">
-      <div><strong>${line.input}</strong><span>1 unit raw input</span></div>
+      <div>${guideArt(line.raw,line.input)}<strong>${line.input}</strong><span>1 unit raw input</span></div>
       <i></i>
-      <div><strong>${line.output}</strong><span>Factory output</span></div>
+      <div>${guideArt(guideState.product,line.output)}<strong>${line.output}</strong><span>Factory output</span></div>
       <i></i>
-      <div><strong>${shop.name}</strong><span>Recommended seller</span></div>
+      <div>${playerBrandMarkup(false)}<strong>${shop.name}</strong><span>Recommended seller</span></div>
     </div>
     <div class="guide-quality">
       <h3>Quality is determined by</h3>
@@ -2223,10 +2245,16 @@ function renderManufacturerGuide() {
     <div class="guide-build-path">
       <strong>Suggested build path</strong>
       <p>1. Build Raw-material Industry for ${line.input}. 2. Build Factory for ${line.output}. 3. Build ${shop.name} to sell it.</p>
+      <div class="guide-actions">
+        <button data-guide-build="industry">Build raw industry</button>
+        <button data-guide-build="factory">Build factory</button>
+        <button data-guide-build="${shopType}">Build seller</button>
+      </div>
     </div>
   </div>`;
   classList.querySelectorAll("[data-guide-class]").forEach(button=>button.onclick=()=>{guideState.productClass=button.dataset.guideClass;guideState.product=(productClasses.find(x=>x.id===guideState.productClass)||productClasses[0]).items[0];renderManufacturerGuide();});
   productList.querySelectorAll("[data-guide-product]").forEach(button=>button.onclick=()=>{guideState.product=button.dataset.guideProduct;guideState.productClass=guideClassForProduct(guideState.product).id;renderManufacturerGuide();});
+  detail.querySelectorAll("[data-guide-build]").forEach(button=>button.onclick=()=>guideBuildFacility(button.dataset.guideBuild,guideState.product));
   document.querySelector("#guide-status").textContent=`${line.input} -> ${line.output}`;
 }
 
