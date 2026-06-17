@@ -247,6 +247,21 @@ function executeMarketTrade(company,side,qty,limit=null,renderAfter=true) {
   return {ok:true};
 }
 
+function closePosition(ticker) {
+  const company=companies.find(item=>item.ticker===ticker);
+  const held=state.holdings[ticker]||0;
+  if (!company || !held) return message("No open position to close.",false);
+  const side=held>0?"sell":"buy";
+  const qty=Math.abs(held);
+  const result=executeMarketTrade(company,side,qty,null,true);
+  if (result?.ok) {
+    addLedger(`Closed ${held>0?"long":"short"} position in ${ticker}`,0);
+    message(`Closed ${ticker} ${held>0?"long":"short"} position.`,true);
+  } else if (result) {
+    message(result.reason,false);
+  }
+}
+
 function applyPositionChange(company,side,qty,price) {
   const ticker=company.ticker, current=state.holdings[ticker]||0, next=side === "buy" ? current+qty : current-qty, average=state.averageCost[ticker]||0;
   if (current===0 || Math.sign(current)===Math.sign(next) && Math.abs(next)>Math.abs(current)) {
@@ -615,6 +630,16 @@ function buildFacility() {
   empireMessage(`${facilityLabel(facility)} opened. It will operate when time advances.`,true);
   playCue("win");
   render();
+}
+
+function quickBuildFacility(type) {
+  const typeSelect=document.querySelector("#facility-type");
+  if (typeSelect) typeSelect.value=type;
+  const blueprint=facilityBlueprints[type], company=companies[0];
+  if (!blueprint) return;
+  if (!hasControl()) return empireMessage("You need board control to build facilities.",false);
+  if (company.companyCash<blueprint.cost) return empireMessage(`Nova needs $${blueprint.cost}m company cash. Use Finance to borrow or issue shares, then build this ${blueprint.name}.`,false);
+  buildFacility();
 }
 
 function upgradeFacility(id) {
@@ -1784,8 +1809,9 @@ function render() {
   document.querySelector("#position").innerHTML=`<div><span>Position</span><strong>${held>0?`${held} long`:held<0?`${Math.abs(held)} short`:"None"}</strong></div><div><span>Average entry</span><strong>${held?money.format(avg):"-"}</strong></div><div><span>Unrealized P/L</span><strong class="${positionProfit>=0?"up":"down"}">${held?money.format(positionProfit):"-"}</strong></div>`;
   const ownedCompanies=companies.filter(c=>state.holdings[c.ticker]);
   document.querySelector("#portfolio").innerHTML=ownedCompanies.length
-    ? `<div class="portfolio-row"><span>Company</span><span>Position</span><span>Value</span><span>P/L</span></div>`+ownedCompanies.map(c=>{const h=state.holdings[c.ticker],pl=(c.price-state.averageCost[c.ticker])*h;return `<div class="portfolio-row"><span><strong>${c.ticker}</strong> ${c.name}</span><span>${h>0?`${h} long`:`${Math.abs(h)} short`}</span><span>${money.format(h*c.price)}</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span></div>`}).join("")
+    ? `<div class="portfolio-row portfolio-head"><span>Company</span><span>Position</span><span>Value</span><span>P/L</span><span>Action</span></div>`+ownedCompanies.map(c=>{const h=state.holdings[c.ticker],pl=(c.price-state.averageCost[c.ticker])*h;return `<div class="portfolio-row"><span><strong>${c.ticker}</strong> ${c.name}</span><span>${h>0?`${h} long`:`${Math.abs(h)} short`}</span><span>${money.format(Math.abs(h*c.price))}</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span><button class="close-position" data-close-position="${c.ticker}">Close</button></div>`}).join("")
     : `<p style="padding:20px;color:var(--muted)">Your portfolio is empty. Choose a company and place your first order.</p>`;
+  document.querySelectorAll("[data-close-position]").forEach(button=>button.onclick=()=>closePosition(button.dataset.closePosition));
   document.querySelector("#news").innerHTML=state.news.length?state.news.map(n=>`<div class="news-item"><time>DAY ${n.day} &middot; ${n.ticker}</time><p>${n.text} <strong class="${n.impact>=0?"up":"down"}">${pct(n.impact)}</strong></p></div>`).join(""):`<p style="padding:20px 4px;color:var(--muted)">No major news yet. Run the next day to move the market.</p>`;
   renderDashboard(worth,investments); renderMarketOverview(); renderTickerTape(); renderStatusConsole(worth); renderAdvisor(); renderCampaign(); renderProgression(); renderEconomy(); renderActivity(); renderInstitutions(); renderFinancialReports(); renderOptions(); renderOperations(); renderFacilities(); renderFinance(); renderTakeovers(); renderModeLocks(); updateEstimate(); renderChart(company);
 }
@@ -2151,19 +2177,30 @@ function renderFirmView() {
   const identity=document.querySelector("#firm-identity");
   if (!identity) return;
   ensureStateDefaults();
-  const facility=state.facilities.find(item=>item.id===state.selectedFacilityId);
+  let facility=state.facilities.find(item=>item.id===state.selectedFacilityId);
+  if (!facility && state.facilities.length) {
+    facility=state.facilities[0];
+    state.selectedFacilityId=facility.id;
+  }
   const slots=document.querySelector("#firm-product-slots"), info=document.querySelector("#firm-info"), building=document.querySelector("#firm-building");
   if (!facility) {
-    identity.innerHTML="<strong>No firm selected</strong><span>Build a facility to open the firm operations screen.</span>";
+    identity.innerHTML=`${playerBrandMarkup(true)}<div><strong>Choose your first firm</strong><span>Build a factory, store, or industry to activate this operations screen.</span></div>`;
     document.querySelector("#firm-profit").textContent="$0";
     document.querySelector("#firm-revenue").textContent="$0";
     document.querySelector("#firm-profit-spark").innerHTML=renderSparkBars(0);
     document.querySelector("#firm-revenue-spark").innerHTML=renderSparkBars(0);
-    slots.innerHTML="<div class=\"firm-empty\">No product slots yet.</div>";
-    info.innerHTML="<p>Select or build a facility to manage products, marketing, upgrades, and exits.</p>";
-    building.className="firm-building";
+    slots.innerHTML=`<div class="firm-empty firm-empty-actions">
+      <article><strong>Factory</strong><span>Turn inputs into finished goods.</span><button data-quick-build="factory">Build factory</button></article>
+      <article><strong>Retail store</strong><span>Sell goods directly to customers.</span><button data-quick-build="store">Build store</button></article>
+      <article><strong>Industry</strong><span>Create raw materials for your supply chain.</span><button data-quick-build="industry">Build industry</button></article>
+    </div>`;
+    info.innerHTML="<h3>Firm operations</h3><p>This area becomes your hands-on business screen. After building a firm you can set prices, production targets, marketing, upgrades, and exits.</p>";
+    building.className="firm-building firm-idle";
+    ["#firm-upgrade","#firm-market","#firm-sell","#firm-demolish"].forEach(selector=>{const button=document.querySelector(selector); if(button)button.disabled=true;});
+    slots.querySelectorAll("[data-quick-build]").forEach(button=>button.onclick=event=>{event.stopPropagation(); quickBuildFacility(button.dataset.quickBuild);});
     return;
   }
+  ["#firm-upgrade","#firm-market","#firm-sell","#firm-demolish"].forEach(selector=>{const button=document.querySelector(selector); if(button)button.disabled=false;});
   const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type], role=facilityRole(facility.type), metrics=facilityMarketMetrics(facility);
   const revenue=Math.max(0,facility.lastUnits*line.unitPrice/1000000), profit=facility.profit||0;
   identity.innerHTML=`${playerBrandMarkup(true)}<div><strong>${facilityLabel(facility)}</strong><span>${blueprint.role}</span></div>`;
