@@ -2216,6 +2216,79 @@ function renderActivity() {
     : `<p style="padding:18px 4px;color:var(--muted)">Trades, dividends, and order activity will appear here.</p>`;
 }
 
+function ensureOperationsHistory() {
+  if (!state.operationsHistory) state.operationsHistory={lastDay:null,revenue:[],brand:[],satisfaction:[],production:[],demand:[],sales:[]};
+  const history=state.operationsHistory;
+  ["revenue","brand","satisfaction","production","demand","sales"].forEach(key=>{if(!Array.isArray(history[key])) history[key]=[];});
+  return history;
+}
+
+function pushOperationsHistory(product, estimate) {
+  const c=companies[0], history=ensureOperationsHistory();
+  const point={
+    revenue:c.dailyRevenue||estimate.sold*product.price/1000000,
+    brand:c.brandScore ?? 68,
+    satisfaction:c.customerSatisfaction ?? 72,
+    production:estimate.produced,
+    demand:estimate.demand,
+    sales:c.dailySales||estimate.sold
+  };
+  if (history.lastDay===state.day) {
+    Object.entries(point).forEach(([key,value])=>history[key][history[key].length-1]=value);
+  } else {
+    Object.entries(point).forEach(([key,value])=>history[key].push(value));
+    history.lastDay=state.day;
+  }
+  Object.keys(point).forEach(key=>{history[key]=history[key].slice(-18);});
+}
+
+function renderMiniBars(values, type="good") {
+  const clean=values.filter(value=>Number.isFinite(value));
+  const max=Math.max(1,...clean.map(value=>Math.abs(value)));
+  const padded=clean.length?clean:Array(8).fill(0);
+  return padded.slice(-14).map(value=>{
+    const height=Math.max(8,Math.round(Math.abs(value)/max*100));
+    return `<b class="${type}" style="--h:${height}%"></b>`;
+  }).join("");
+}
+
+function renderOperationsLiveGraphs(product, estimate) {
+  const target=document.querySelector("#operations-live-graphs");
+  if (!target || !product || !estimate) return;
+  const c=companies[0], history=ensureOperationsHistory(), inputs=managementInputs();
+  const revenuePreview=estimate.sold*inputs.price/1000000;
+  const revenueSeries=[...history.revenue.slice(-13),revenuePreview];
+  const brandSeries=[...history.brand.slice(-13),c.brandScore ?? 68];
+  const production=Math.max(0,estimate.produced);
+  const demand=Math.max(0,estimate.demand);
+  const sold=Math.max(0,estimate.sold);
+  const maxFlow=Math.max(1,production,demand,sold);
+  const revenueLabel=`$${revenuePreview.toFixed(2)}m forecast`;
+  const brandLabel=`${Math.round(c.brandScore ?? 68)} / 100`;
+  target.innerHTML=`<article class="live-graph-card">
+      <header><h3>Revenue trend</h3><strong>${revenueLabel}</strong></header>
+      <div class="mini-bars" aria-label="Revenue trend">${renderMiniBars(revenueSeries,"good")}</div>
+      <p class="graph-caption">Bars include recent days plus the current slider forecast.</p>
+    </article>
+    <article class="live-graph-card">
+      <header><h3>Brand & customers</h3><strong>${brandLabel}</strong></header>
+      <div class="mini-bars" aria-label="Brand score">${renderMiniBars(brandSeries,"warn")}</div>
+      <div class="versus-bars" aria-label="Customer satisfaction">
+        <span><b>Customers</b><i style="--w:${Math.round((c.customerSatisfaction ?? 72))}%"></i><em>${Math.round(c.customerSatisfaction ?? 72)}</em></span>
+      </div>
+      <p class="graph-caption">Research, quality, price, fill rate, and profit all push this up or down.</p>
+    </article>
+    <article class="live-graph-card">
+      <header><h3>Production vs demand</h3><strong>${sold.toLocaleString()} sold</strong></header>
+      <div class="versus-bars">
+        <span><b>Production</b><i style="--w:${Math.round(production/maxFlow*100)}%"></i><em>${production.toLocaleString()}</em></span>
+        <span><b>Demand</b><i style="--w:${Math.round(demand/maxFlow*100)}%"></i><em>${demand.toLocaleString()}</em></span>
+        <span><b>Sold</b><i style="--w:${Math.round(sold/maxFlow*100)}%"></i><em>${sold.toLocaleString()}</em></span>
+      </div>
+      <p class="graph-caption">If demand is above production, you may be leaving sales on the table.</p>
+    </article>`;
+}
+
 function renderOperations() {
   const c=companies[0], selected=c.products[state.selectedProduct]?.active?c.products[state.selectedProduct]:c.products.find(p=>p.active), selectedIndex=c.products.indexOf(selected);
   state.selectedProduct=selectedIndex;
@@ -2225,6 +2298,7 @@ function renderOperations() {
   Object.entries(controls).forEach(([id,value])=>{const input=document.querySelector(`#${id}`);if(document.activeElement!==input)input.value=value;});
   document.querySelector("#active-product-name").textContent=`Managing ${selected.name} - ${selected.segment} segment`;
   refreshDecisionLabels(false);
+  pushOperationsHistory(product,estimateManagementImpact(product,managementInputs()));
   const activeProduction=c.products.filter(p=>p.active).reduce((sum,p)=>sum+p.production,0);
   const values=[
     ["Company cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>=5],
@@ -2288,6 +2362,7 @@ function renderManagementPreview(applied=false) {
   const c=companies[0], product=c.products[state.selectedProduct] || c.products.find(item=>item.active);
   if (!product) { box.innerHTML=""; return; }
   const inputs=managementInputs(), estimate=estimateManagementImpact(product,inputs);
+  renderOperationsLiveGraphs(product,estimate);
   const demandWidth=Math.min(100,Math.round(estimate.demand/product.marketPotential*70));
   const productionWidth=Math.min(100,Math.round(estimate.produced/Math.max(1,inputs.production)*100));
   const profitWidth=Math.max(4,Math.min(100,Math.round((estimate.profit+1)*35)));
