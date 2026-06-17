@@ -529,6 +529,54 @@ function facilityRole(type) {
   return "store";
 }
 
+function playerBrandMarkup(compact=false) {
+  const player=state.player||{};
+  const mode=state.mode==="expert"?"Expert Mode":"Guided Mode";
+  return `<div class="player-brand ${compact?"compact":""}">
+    <i class="avatar-chip ${player.avatar||"founder-a"}"></i>
+    <i class="logo-chip ${player.logo||"logo-a"}"></i>
+    <div><strong>${player.companyName||"Nova Devices"}</strong><span>${player.name||"Founder"} &middot; ${mode}</span></div>
+  </div>`;
+}
+
+function renderPlayerBrand() {
+  const card=document.querySelector("#player-brand-card");
+  if (card) card.innerHTML=playerBrandMarkup(false);
+}
+
+function facilityMarketMetrics(facility) {
+  const line=productLines[facility.line], role=facilityRole(facility.type), settings=difficultySettings();
+  const capacity=facilityBlueprints[facility.type].capacity*facility.level;
+  // GAME BALANCE TUNING:
+  // These facility economics make factories/stores readable before time advances.
+  // Adjust competitorBase, marketingLift, and costPressure here when balancing the Empire loop.
+  const competitorBase=line.unitPrice*(.94+((state.day+facility.id)%17)/100);
+  const competitorPrice=Math.max(line.unitCost*1.35,competitorBase);
+  const priceAppeal=clamp((competitorPrice/Math.max(1,line.unitPrice))**settings.priceSensitivity,.45,1.65);
+  const marketingLift=1+Math.sqrt(facility.marketing/50)*settings.marketingEfficiency;
+  const macro=clamp(state.economy.confidence/100*(1+(state.economy.growth-.02)*2),.55,1.35);
+  const demand=Math.max(0,Math.round(line.market*priceAppeal*marketingLift*macro*settings.demandMultiplier));
+  const unitCost=line.unitCost*settings.costPressure;
+  const grossMargin=(line.unitPrice-unitCost)/Math.max(1,line.unitPrice);
+  const stock=role==="industry"?facility.rawInventory:facility.finishedInventory;
+  const marketingCost=facility.marketing*1000;
+  const contribution=Math.max(1,line.unitPrice-unitCost);
+  const breakEvenUnits=Math.ceil(marketingCost/contribution);
+  const possibleUnits=role==="store"?Math.min(stock,capacity,demand):Math.min(capacity,demand);
+  const estimatedProfit=(possibleUnits*line.unitPrice-possibleUnits*unitCost-marketingCost)/1000000;
+  const capacityUse=capacity?clamp((facility.lastUnits||0)/capacity,0,1):0;
+  return {line,role,capacity,competitorPrice,demand,unitCost,grossMargin,stock,breakEvenUnits,estimatedProfit,capacityUse,possibleUnits};
+}
+
+function facilityAdvice(metrics) {
+  if (metrics.role==="store" && metrics.stock<metrics.demand*.35) return "Demand is higher than your store inventory. Build or upgrade a factory feeding this product line.";
+  if (metrics.line.unitPrice>metrics.competitorPrice*1.08) return "Your selling price is above the competitor. A premium can work, but demand will be harder to win.";
+  if (metrics.grossMargin<.22) return "Margin is thin. Consider upgrades, a stronger supply chain, or selling a higher-margin product.";
+  if (metrics.capacityUse>.9) return "This facility is close to full capacity. Upgrade it if demand keeps growing.";
+  if (metrics.estimatedProfit<0) return "The current setup looks unprofitable. Raise price, lower marketing, or improve volume before scaling.";
+  return "The economics look healthy. Watch inventory and competitor price before expanding.";
+}
+
 function empireMessage(text,good) {
   const el=document.querySelector("#empire-status");
   if (el) { el.textContent=text; el.className=good?"up":"down"; }
@@ -1519,6 +1567,7 @@ function toggleTime() {
 
 function renderDashboard(worth,investments) {
   const hero=document.querySelector("#hero-net-worth"),previous=Number(hero.dataset.value||worth),dailyPnl=worth-(state.dayStartEquity||state.startWorth);
+  renderPlayerBrand();
   hero.textContent=money.format(worth); hero.dataset.value=worth;
   if (Math.abs(worth-previous)>.01) {
     hero.className=worth>previous?"flash-up":"flash-down";
@@ -2013,9 +2062,9 @@ function renderFirmView() {
     building.className="firm-building";
     return;
   }
-  const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type], role=facilityRole(facility.type);
+  const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type], role=facilityRole(facility.type), metrics=facilityMarketMetrics(facility);
   const revenue=Math.max(0,facility.lastUnits*line.unitPrice/1000000), profit=facility.profit||0;
-  identity.innerHTML=`<div class="firm-portrait">${blueprint.name.slice(0,2).toUpperCase()}</div><div><strong>${facilityLabel(facility)}</strong><span>${state.player.companyName} &middot; ${blueprint.role}</span></div>`;
+  identity.innerHTML=`${playerBrandMarkup(true)}<div><strong>${facilityLabel(facility)}</strong><span>${blueprint.role}</span></div>`;
   document.querySelector("#firm-profit").textContent=`${profit>=0?"+":""}$${profit.toFixed(3)}m`;
   document.querySelector("#firm-profit").className=profit>=0?"up":"down";
   document.querySelector("#firm-revenue").textContent=`$${revenue.toFixed(3)}m`;
@@ -2029,7 +2078,27 @@ function renderFirmView() {
   ];
   slots.innerHTML=productSlots.map(slot=>`<article class="firm-slot"><div class="firm-slot-art">${slot.name.slice(0,2).toUpperCase()}</div><div><strong>${slot.name}</strong><span>${slot.label}</span><small>${Number(slot.units).toLocaleString()} units</small></div><i style="--q:${slot.quality}%"></i></article>`).join("");
   building.className=`firm-building firm-${role}`;
-  info.innerHTML=`<h3>${blueprint.name}</h3><p>${line.input} -> ${line.output}</p><div class="firm-info-grid"><span>Level<strong>${facility.level}</strong></span><span>Last units<strong>${facility.lastUnits.toLocaleString()}</strong></span><span>Inventory<strong>${(role==="industry"?facility.rawInventory:facility.finishedInventory).toLocaleString()}</strong></span><span>Marketing<strong>$${facility.marketing}k/day</strong></span></div>`;
+  info.innerHTML=`<h3>${blueprint.name}</h3><p>${line.input} -> ${line.output}</p>
+    <div class="firm-info-grid">
+      <span>Level<strong>${facility.level}</strong></span>
+      <span>Last units<strong>${facility.lastUnits.toLocaleString()}</strong></span>
+      <span>Inventory<strong>${metrics.stock.toLocaleString()}</strong></span>
+      <span>Capacity<strong>${metrics.capacity.toLocaleString()}/day</strong></span>
+    </div>
+    <div class="firm-economics">
+      <h3>Market economics</h3>
+      <div class="firm-economics-grid">
+        <span>Your price<strong>${money.format(line.unitPrice)}</strong></span>
+        <span>Competitor price<strong>${money.format(metrics.competitorPrice)}</strong></span>
+        <span>Unit cost<strong>${money.format(metrics.unitCost)}</strong></span>
+        <span>Gross margin<strong class="${metrics.grossMargin>=.25?"up":"down"}">${pct(metrics.grossMargin)}</strong></span>
+        <span>Demand forecast<strong>${metrics.demand.toLocaleString()}</strong></span>
+        <span>Break-even units<strong>${metrics.breakEvenUnits.toLocaleString()}</strong></span>
+        <span>Possible sales<strong>${metrics.possibleUnits.toLocaleString()}</strong></span>
+        <span>Profit forecast<strong class="${metrics.estimatedProfit>=0?"up":"down"}">${metrics.estimatedProfit>=0?"+":""}$${metrics.estimatedProfit.toFixed(3)}m</strong></span>
+      </div>
+      <p>${facilityAdvice(metrics)}</p>
+    </div>`;
   document.querySelector("#firm-upgrade").onclick=()=>upgradeFacility(facility.id);
   document.querySelector("#firm-market").onclick=()=>marketFacility(facility.id);
   document.querySelector("#firm-sell").onclick=()=>sellFacility(facility.id,false);
@@ -2044,14 +2113,17 @@ function renderFacilities() {
   document.querySelector("#empire-status").textContent=state.facilities.length?`${state.facilities.length} facilities operating`:"Build your first factory, store, or industry";
   list.innerHTML=state.facilities.length?state.facilities.map(facility=>{
     const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type];
+    const metrics=facilityMarketMetrics(facility);
     const kpis=[
       ["Level",facility.level],
       ["Last units",facility.lastUnits.toLocaleString()],
       ["Marketing",`$${facility.marketing}k/day`],
-      ["Last profit",`$${facility.profit.toFixed(3)}m`]
+      ["Last profit",`$${facility.profit.toFixed(3)}m`],
+      ["Competitor",money.format(metrics.competitorPrice)],
+      ["Margin",pct(metrics.grossMargin)]
     ].map(item=>`<span>${item[0]}<strong>${item[1]}</strong></span>`).join("");
     const stock=facilityRole(facility.type)==="industry"?`${facility.rawInventory.toLocaleString()} ${line.input}`:`${facility.finishedInventory.toLocaleString()} ${line.output}`;
-    return `<article class="facility-card ${facility.id===state.selectedFacilityId?"selected":""}" data-select-facility="${facility.id}"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Price<strong>${money.format(line.unitPrice)}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
+    return `<article class="facility-card ${facility.id===state.selectedFacilityId?"selected":""}" data-select-facility="${facility.id}"><h3>${facilityLabel(facility)}</h3><small>${blueprint.role}</small><div class="facility-kpis">${kpis}<span>Stock<strong>${stock}</strong></span><span>Demand<strong>${metrics.demand.toLocaleString()}</strong></span></div><button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
   }).join(""):`<div class="builder-card"><h3>No facilities yet</h3><p>Start small: build an industry for raw materials, a factory to make goods, and a store to sell them.</p></div>`;
   document.querySelectorAll("[data-select-facility]").forEach(card=>card.onclick=event=>{if(event.target.tagName==="BUTTON")return;state.selectedFacilityId=+card.dataset.selectFacility;render();});
   document.querySelectorAll("[data-upgrade-facility]").forEach(button=>button.onclick=()=>upgradeFacility(+button.dataset.upgradeFacility));
@@ -2162,7 +2234,8 @@ document.querySelector("#launch-start").onclick=()=>newGame(true,"guided");
 document.querySelector("#launch-expert").onclick=()=>startExpertMode(false);
 document.querySelector("#launch-load").onclick=()=>loadGame();
 document.querySelector("#launch-email-load").onclick=cloudLoadGame;
-document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
+const launchExplore=document.querySelector("#launch-explore");
+if (launchExplore) launchExplore.onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
 document.querySelector("#tutorial-next").onclick=nextTutorialStep;
 document.querySelector("#tutorial-skip").onclick=finishTutorial;
 document.querySelector("#difficulty").onchange=()=>{if(state.day>1)message("Difficulty applies when you start a new game.",false);};

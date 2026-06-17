@@ -14,6 +14,14 @@ button:disabled { cursor:not-allowed; opacity:.42; filter:saturate(.4); }
 main { padding:18px 34px 30px 112px; }
 .command-rail { position:fixed; left:12px; top:126px; z-index:20; width:82px; padding:7px; background:linear-gradient(90deg,#0a2b72,#1160bd 55%,#08275e); border:3px ridge #55aaff; border-radius:18px; box-shadow:6px 8px 20px #0008; } .command-rail a { display:grid; place-items:center; min-height:58px; margin:4px 0; color:#dcefff; text-decoration:none; border:2px outset #3e91e8; border-radius:12px; background:linear-gradient(#1362b7,#082b6c); } .command-rail a:hover { background:linear-gradient(#2084df,#0c438e);color:#fff6a6; } .command-rail b { display:grid;place-items:center;width:30px;height:25px;color:#fff6a6;background:#071b43;border:1px solid #65baff;border-radius:8px;font:800 11px Consolas,monospace; } .command-rail span { font-size:9px;text-transform:uppercase;letter-spacing:.05em; }
 .dashboard { display:grid; grid-template-columns:1.25fr .9fr .85fr; margin-bottom:16px; min-height:230px; } .dashboard > div { padding:22px; border-right:1px solid var(--line); } .dashboard > div:last-child { border:0; } .dashboard-hero > span { display:block; color:var(--muted); margin-top:12px; } #hero-net-worth { display:block; font:700 clamp(34px,4vw,58px)/1.1 Consolas,"Courier New",monospace; letter-spacing:-.05em; margin:5px 0; transition:color .25s,transform .25s; } #hero-net-worth.flash-up { color:var(--green);transform:scale(1.015); } #hero-net-worth.flash-down { color:var(--red);transform:scale(.99); } .hero-pnl { font:700 15px Consolas,"Courier New",monospace; } .equity-sparkline { display:flex; align-items:end; gap:3px; height:55px; margin-top:20px; } .equity-sparkline i { flex:1; min-width:3px; border-radius:3px 3px 0 0; background:linear-gradient(var(--blue),#1f4b88); opacity:.85; } .allocation-wrap { display:grid; grid-template-columns:135px 1fr; align-items:center; gap:18px; } .allocation-ring { position:relative; width:128px; aspect-ratio:1; border-radius:50%; display:grid; place-items:center; transform:rotateX(58deg) rotateZ(-18deg); box-shadow:0 20px 28px #0008,inset 0 0 20px #fff2; transition:background .4s; } .allocation-ring:after { content:""; position:absolute; width:66%; aspect-ratio:1; border-radius:50%; background:#101722; box-shadow:inset 0 0 15px #000; } .allocation-ring div { position:relative; z-index:1; text-align:center; transform:rotateZ(18deg) rotateX(-58deg); } .allocation-ring strong,.allocation-ring span { display:block; } .allocation-ring span { color:var(--muted); font-size:10px; } .allocation-legend { margin-top:10px; } .allocation-legend div { display:grid; grid-template-columns:9px 1fr auto; gap:7px; align-items:center; margin:6px 0; font-size:11px; } .allocation-legend i { width:8px;height:8px;border-radius:50%; } .dashboard-movers h3 { margin-bottom:10px; } .mover-row { display:grid; grid-template-columns:1fr auto; padding:8px 0; border-bottom:1px solid var(--line); } .mover-row small { display:block;color:var(--muted); } .mover-row strong { font:700 12px Consolas,"Courier New",monospace; }
+.player-brand-card { margin-top:10px; }
+.player-brand { display:grid; grid-template-columns:52px 52px 1fr; gap:10px; align-items:center; padding:10px; border:2px ridge #58adff; border-radius:14px; background:linear-gradient(135deg,#061b43,#0b3a82); box-shadow:inset 0 0 18px #0007; }
+.player-brand.compact { grid-template-columns:44px 44px 1fr; min-width:260px; padding:7px; background:#061b43; }
+.player-brand .avatar-chip,.player-brand .logo-chip { width:52px; height:52px; border-radius:14px; }
+.player-brand.compact .avatar-chip,.player-brand.compact .logo-chip { width:44px; height:44px; border-radius:12px; }
+.player-brand strong,.player-brand span { display:block; }
+.player-brand strong { color:#fff6a6; font-size:15px; }
+.player-brand span { color:#9ed0ff; font-size:11px; }
 .mission-card { grid-column:1/-1; display:grid; grid-template-columns:1fr 1.1fr 1.1fr; gap:18px; border-top:1px solid var(--line); background:linear-gradient(120deg,#061a3c,#0a3d86); }
 .mission-card h2 { color:#fff6a5; margin:2px 0 8px; }
 .mission-card p { color:#c7e4ff; }
@@ -93,7 +101,7 @@ label { color:var(--muted); } input { display:block; margin-top:6px; width:100%;
 .facility-card.selected { box-shadow:inset 0 4px #fbbf24,0 0 20px #fbbf2444; border-color:#fff6a6; }
 .firm-view { border-top:3px ridge #49a3f3; background:linear-gradient(180deg,#0c4c9f,#061b41); }
 .firm-topbar { display:grid; grid-template-columns:1.2fr 1fr 1.2fr; gap:10px; padding:12px; background:#0a5cc2; border-bottom:3px ridge #49a3f3; }
-#firm-identity { display:grid; grid-template-columns:70px 1fr; gap:10px; align-items:center; background:#0f75d8; border:2px ridge #58adff; padding:8px; }
+#firm-identity { display:grid; grid-template-columns:minmax(230px,1.4fr) 1fr; gap:10px; align-items:center; background:#0f75d8; border:2px ridge #58adff; padding:8px; }
 #firm-identity strong,#firm-identity span { display:block; }
 .firm-portrait { display:grid; place-items:center; height:58px; background:linear-gradient(135deg,#09204c,#1ba6ff); border:2px ridge #f7df72; color:#fff6a6; font-weight:900; }
 .firm-mini-kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -121,6 +129,11 @@ label { color:var(--muted); } input { display:block; margin-top:6px; width:100%;
 .firm-info-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:10px; }
 .firm-info-grid span { background:#0b2f70; border:1px solid #55aaff; border-radius:8px; padding:8px; color:#9ed0ff; }
 .firm-info-grid strong { display:block; color:#fff; }
+.firm-economics { margin-top:12px; padding-top:12px; border-top:1px solid #55aaff88; }
+.firm-economics-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px; }
+.firm-economics-grid span { background:#031936; border:1px solid #377fd0; border-radius:8px; padding:8px; color:#9ed0ff; }
+.firm-economics-grid strong { display:block; color:#fff; font:800 13px Consolas,"Courier New",monospace; }
+.firm-economics p { margin-top:10px; padding-left:10px; border-left:3px solid #fbbf24; color:#fff0a8; font-size:12px; }
 .firm-empty { padding:20px; color:#b9d8ff; }
 .manufacturer-guide { border-top:3px ridge #49a3f3; background:linear-gradient(145deg,#082b69,#041a3d); }
 .guide-grid { display:grid; grid-template-columns:.8fr 1fr 1.35fr; gap:18px; padding:20px; }
