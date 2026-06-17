@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=business-cashflow-v1">
+  <link rel="stylesheet" href="styles.css?v=learning-books-time-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -16,7 +16,7 @@
       <div id="header-brand-mark" class="header-brand-mark"></div>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">Husk at starte tiden, når du er klar.</span></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -65,6 +65,20 @@
           <h3>Business pulse</h3>
           <div id="mission-report"></div>
         </div>
+      </div>
+    </section>
+
+    <section id="learning-center" class="learning-center panel hidden">
+      <div class="panel-title"><div><h2>Business Learning Center</h2><span>Frivillig undervisning: læs kun når du selv vælger det</span></div><strong id="learning-center-status"></strong></div>
+      <div class="learning-grid">
+        <div class="learning-overview">
+          <p class="eyebrow">CURRENT COURSE</p>
+          <h2 id="learning-title"></h2>
+          <p id="learning-description"></p>
+          <button id="open-lesson-book" class="lesson-book-button" type="button"><span>🎓</span> Open mini book / report</button>
+        </div>
+        <div id="learning-case" class="learning-case"></div>
+        <div id="learning-levels" class="learning-levels"></div>
       </div>
     </section>
 
@@ -351,6 +365,13 @@
     <div class="modal-card"><p class="eyebrow" id="modal-kicker"></p><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-score" class="modal-score"></div><button id="modal-button" class="primary">Start a new game</button></div>
   </div>
 
+  <div id="lesson-book-modal" class="modal hidden lesson-book-modal" role="dialog" aria-modal="true">
+    <article class="lesson-book-card">
+      <div class="lesson-book-toolbar"><button id="lesson-book-close" type="button">Close</button><button id="lesson-book-print" class="primary" type="button">Print / save as PDF</button></div>
+      <div id="lesson-book-content" class="lesson-book-content"></div>
+    </article>
+  </div>
+
   <footer>Market mechanics inspired by the MIT-licensed Bristol Stock Exchange by Dave Cliff. This is a fictional game, not financial advice.</footer>
   <div class="status-console">
     <div class="status-news"><strong>WIRE</strong><span id="status-headline">Market network online.</span></div>
@@ -358,6 +379,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=business-cashflow-v1"></script>
+  <script src="game.js?v=learning-books-time-v1"></script>
 </body>
 </html>

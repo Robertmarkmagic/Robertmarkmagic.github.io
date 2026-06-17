@@ -1602,6 +1602,53 @@ function jumpToLearningSystem(selector) {
   if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+function lessonBookHtml(lesson) {
+  return `<h1>${lesson.title}</h1>
+    <p class="book-meta">Market Foundry Business Academy · Optional mini book</p>
+    <div class="book-callout"><strong>Case:</strong> ${lesson.case}</div>
+    <h2>1. The business idea</h2>
+    <p>${lesson.description} In a real business simulator, this system should teach through decisions instead of lectures. The best learning happens when you make a choice, watch the numbers change, and then understand why.</p>
+    <h2>2. What matters in the real world</h2>
+    <p>${lesson.takeaway} Good operators look for cause and effect: price changes demand, cost changes margin, inventory changes cash, and competition changes what customers expect.</p>
+    <h2>3. How to test it in the game</h2>
+    <ol>${lesson.levels.map(item=>`<li>${item}</li>`).join("")}</ol>
+    <h2>4. Decision checklist</h2>
+    <ul>
+      <li>What number am I trying to improve: cash, profit, demand, margin, market share, or risk?</li>
+      <li>What is the trade-off? Higher margin may reduce demand. Higher growth may consume cash.</li>
+      <li>What will I compare after time advances: before/after profit, inventory, satisfaction, or portfolio value?</li>
+      <li>What would a competitor do if they saw my strategy?</li>
+    </ul>
+    <h2>5. Mini assignment</h2>
+    <p>Play five in-game days focused only on this topic. Write down one decision, one expected result, and one surprise. If the result is not what you expected, that is not failure; that is the lesson.</p>
+    <div class="book-callout"><strong>Remember:</strong> This is education and entertainment, not financial advice. The goal is to build business intuition.</div>`;
+}
+
+function renderLearningCenter() {
+  const center=document.querySelector("#learning-center");
+  if (!center) return;
+  ensureMissionDefaults();
+  const lesson=currentLesson(), active=state.missions.boardMode==="learn";
+  center.classList.toggle("hidden",!active);
+  if (!active) return;
+  document.querySelector("#learning-center-status").textContent="Optional course";
+  document.querySelector("#learning-title").textContent=lesson.title;
+  document.querySelector("#learning-description").textContent=lesson.description;
+  document.querySelector("#learning-case").innerHTML=`<h3>Business case</h3><p>${lesson.case}</p><h3>Key idea</h3><p>${lesson.takeaway}</p>`;
+  document.querySelector("#learning-levels").innerHTML=`<h3>Try it in game</h3><ol>${lesson.levels.map(item=>`<li>${item}</li>`).join("")}</ol><button class="lesson-jump" data-lesson-jump="${lesson.jump}">${lesson.jumpLabel}</button>`;
+  document.querySelectorAll("#learning-center [data-lesson-jump]").forEach(button=>button.onclick=()=>jumpToLearningSystem(button.dataset.lessonJump));
+}
+
+function openLessonBook() {
+  const lesson=currentLesson();
+  document.querySelector("#lesson-book-content").innerHTML=lessonBookHtml(lesson);
+  document.querySelector("#lesson-book-modal").classList.remove("hidden");
+}
+
+function closeLessonBook() {
+  document.querySelector("#lesson-book-modal").classList.add("hidden");
+}
+
 function setupHoverDropdown(select) {
   if (!select || select.dataset.hoverDropdownReady) return;
   select.dataset.hoverDropdownReady="true";
@@ -1734,7 +1781,7 @@ function handleKeyboard(event) {
   else if (key===" " && document.querySelector("#launch-modal").classList.contains("hidden")) { event.preventDefault(); executeTrade(); }
   else if (key==="enter") { event.preventDefault(); runDays(1); }
   else if (key==="m") { event.preventDefault(); toggleAudio(); }
-  else if (key==="escape") { finishTutorial(); document.querySelector("#game-modal").classList.add("hidden"); }
+  else if (key==="escape") { finishTutorial(); document.querySelector("#game-modal").classList.add("hidden"); closeLessonBook(); }
 }
 
 function setupTouchControls() {
@@ -1787,8 +1834,17 @@ function toggleTime() {
   ensureStateDefaults();
   state.autoTime.running=!state.autoTime.running;
   state.autoTime.accumulator=0;
-  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
+  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Stop time":"Start time";
   playCue(state.autoTime.running?"day":"click");
+  renderTimeGuidance();
+}
+
+function renderTimeGuidance() {
+  const hint=document.querySelector("#time-guidance");
+  if (!hint) return;
+  const running=Boolean(state.autoTime?.running);
+  hint.textContent=running?"Tiden kører. Tryk Stop time hvis du vil pause.":"Husk at starte tiden, når du er klar.";
+  hint.classList.toggle("running",running);
 }
 
 function renderDashboard(worth,investments) {
@@ -1843,6 +1899,7 @@ function renderMissionDashboard() {
   document.querySelector("#lesson-picker").classList.toggle("hidden",!learnMode);
   const lessonSelector=document.querySelector("#lesson-select");
   if (lessonSelector) lessonSelector.innerHTML=learningTracks.map(item=>`<option value="${item.id}" ${item.id===lesson.id?"selected":""}>${item.title}</option>`).join("");
+  renderLearningCenter();
   if (learnMode) {
     document.querySelector("#mission-kicker").textContent="LEARN ON DEMAND - NO REQUIRED TUTORIAL";
     document.querySelector("#mission-title").textContent=`Learn: ${lesson.title}`;
@@ -1922,7 +1979,8 @@ function render() {
   checkProgression();
   const company=companies[state.selected], investments=portfolioValue(), worth=accountEquity(), change=(company.price-company.previous)/company.previous;
   document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}, Q${Math.floor(((state.day-1)%TRADING_DAYS_PER_YEAR)/60)+1}, Day ${state.day}`;
-  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
+  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Stop time":"Start time";
+  renderTimeGuidance();
   document.querySelector("#time-speed").value=String(state.autoTime.speed||1);
   companies[0].name=state.player.companyName||companies[0].name;
   document.querySelector("#cash").textContent=money.format(state.cash); document.querySelector("#investments").textContent=money.format(investments); document.querySelector("#net-worth").textContent=money.format(worth);
@@ -2600,6 +2658,9 @@ document.querySelector("#lesson-select").onchange=event=>{ensureMissionDefaults(
 document.querySelectorAll("[data-board-mode]").forEach(button=>button.onclick=()=>{ensureMissionDefaults();state.missions.boardMode=button.dataset.boardMode;state.advisorHidden=button.dataset.boardMode==="challenge"?false:true;render();});
 setupHoverDropdown(document.querySelector("#task-select"));
 setupHoverDropdown(document.querySelector("#lesson-select"));
+document.querySelector("#open-lesson-book").onclick=openLessonBook;
+document.querySelector("#lesson-book-close").onclick=closeLessonBook;
+document.querySelector("#lesson-book-print").onclick=()=>window.print();
 window.addEventListener("keydown",handleKeyboard);
 setupTouchControls();
 window.addEventListener("resize",()=>renderChart(companies[state.selected])); bootstrapSavedMode(); render();
