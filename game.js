@@ -1580,6 +1580,18 @@ function jumpToLearningSystem(selector) {
   if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+function setupHoverDropdown(select) {
+  if (!select || select.dataset.hoverDropdownReady) return;
+  select.dataset.hoverDropdownReady="true";
+  const close=()=>{select.removeAttribute("size"); select.classList.remove("hover-open");};
+  const open=()=>{select.setAttribute("size",String(Math.min(select.options.length,8))); select.classList.add("hover-open");};
+  select.addEventListener("mouseenter",open);
+  select.addEventListener("focus",open);
+  select.addEventListener("mouseleave",close);
+  select.addEventListener("blur",close);
+  select.addEventListener("change",()=>setTimeout(close,0));
+}
+
 function businessSignals() {
   const c=companies[0], active=c.products.filter(p=>p.active);
   const potential=active.reduce((sum,p)=>sum+p.marketPotential,0)||1;
@@ -2559,6 +2571,8 @@ document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
 document.querySelector("#task-select").onchange=event=>{ensureMissionDefaults();state.missions.selected=event.target.value;state.advisorHidden=false;render();};
 document.querySelector("#lesson-select").onchange=event=>{ensureMissionDefaults();state.missions.selectedLesson=event.target.value;state.missions.boardMode="learn";state.advisorHidden=true;render();};
 document.querySelectorAll("[data-board-mode]").forEach(button=>button.onclick=()=>{ensureMissionDefaults();state.missions.boardMode=button.dataset.boardMode;state.advisorHidden=button.dataset.boardMode==="challenge"?false:true;render();});
+setupHoverDropdown(document.querySelector("#task-select"));
+setupHoverDropdown(document.querySelector("#lesson-select"));
 window.addEventListener("keydown",handleKeyboard);
 setupTouchControls();
 window.addEventListener("resize",()=>renderChart(companies[state.selected])); bootstrapSavedMode(); render();
