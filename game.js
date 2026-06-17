@@ -542,6 +542,8 @@ function playerBrandMarkup(compact=false) {
 function renderPlayerBrand() {
   const card=document.querySelector("#player-brand-card");
   if (card) card.innerHTML=playerBrandMarkup(false);
+  const headerBrand=document.querySelector("#header-brand-mark");
+  if (headerBrand) headerBrand.innerHTML=playerBrandMarkup(true);
 }
 
 function facilityMarketMetrics(facility) {

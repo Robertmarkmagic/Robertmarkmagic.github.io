@@ -22,6 +22,11 @@ main { padding:18px 34px 30px 112px; }
 .player-brand strong,.player-brand span { display:block; }
 .player-brand strong { color:#fff6a6; font-size:15px; }
 .player-brand span { color:#9ed0ff; font-size:11px; }
+.header-brand-mark { margin-top:10px; max-width:360px; }
+.header-brand-mark .player-brand { width:max-content; max-width:100%; grid-template-columns:42px 42px minmax(120px,1fr); padding:7px 9px; }
+.header-brand-mark .player-brand .avatar-chip,.header-brand-mark .player-brand .logo-chip { width:42px; height:42px; border-radius:12px; }
+.header-brand-mark .player-brand strong { font-size:13px; }
+.header-brand-mark .player-brand span { font-size:10px; }
 .mission-card { grid-column:1/-1; display:grid; grid-template-columns:1fr 1.1fr 1.1fr; gap:18px; border-top:1px solid var(--line); background:linear-gradient(120deg,#061a3c,#0a3d86); }
 .mission-card h2 { color:#fff6a5; margin:2px 0 8px; }
 .mission-card p { color:#c7e4ff; }
@@ -435,6 +440,17 @@ input,select,textarea { font-size:16px; }
 #launch-modal .founder-setup,#launch-modal .launch-advisor,#launch-modal .cloud-panel { flex:0 0 auto; align-self:stretch; }
 #launch-modal .founder-setup .portrait-grid,#launch-modal .founder-setup .logo-grid { overflow:visible!important; padding:0!important; scrollbar-width:none; }
 #launch-modal .founder-setup .portrait-grid::-webkit-scrollbar,#launch-modal .founder-setup .logo-grid::-webkit-scrollbar { display:none; }
+
+.avatar-chip {
+  background-image:url("assets/founder-portraits.png")!important;
+  background-size:500% 200%!important;
+  background-repeat:no-repeat!important;
+}
+.logo-chip {
+  background-image:url("assets/brand-logos.png")!important;
+  background-size:500% 200%!important;
+  background-repeat:no-repeat!important;
+}
 
 @media(max-height:760px) and (min-width:701px){
   #launch-modal .launch-card { height:auto; min-height:calc(100dvh - 32px); overflow:visible; }
