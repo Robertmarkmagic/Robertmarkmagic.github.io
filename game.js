@@ -377,6 +377,7 @@ function ensureStateDefaults() {
   if (!state.mode || state.mode==="open") state.mode="guided";
   if (!state.player) state.player={name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"};
   if (!Array.isArray(state.facilities)) state.facilities=[];
+  if (!state.commodityInventory) state.commodityInventory={};
   state.facilities.forEach(facility=>{
     const line=productLines[facility.line], blueprint=facilityBlueprints[facility.type];
     if (line && !Number.isFinite(facility.price)) facility.price=line.unitPrice;
@@ -670,6 +671,64 @@ function facilityAdvice(metrics) {
   return "The economics look healthy. Watch inventory and competitor price before expanding.";
 }
 
+function commodityCatalog() {
+  const byRaw={};
+  Object.entries(productLines).forEach(([key,line])=>{
+    if (!byRaw[line.raw]) byRaw[line.raw]={raw:line.raw,name:line.input,lines:[],base:line.unitCost};
+    byRaw[line.raw].lines.push(key);
+    byRaw[line.raw].base=(byRaw[line.raw].base+line.unitCost)/2;
+  });
+  return Object.values(byRaw);
+}
+
+function commodityPrice(raw) {
+  const item=commodityCatalog().find(entry=>entry.raw===raw), base=item?.base || 10;
+  const cycle=1+Math.sin((state.day+(raw||"").length*7)/11)*.08+Math.cos((state.day+(raw||"").charCodeAt(0))/17)*.05;
+  const inflation=1+Math.max(-.02,state.economy.inflation)*1.2;
+  return Math.max(1,base*cycle*inflation);
+}
+
+function tradeCommodity(raw, quantity) {
+  ensureStateDefaults();
+  const qty=Math.round(quantity), company=companies[0], price=commodityPrice(raw), value=price*Math.abs(qty)/1000000;
+  if (!qty) return;
+  if (qty>0) {
+    if (company.companyCash<value) return empireMessage(`Nova needs $${value.toFixed(3)}m company cash to buy ${Math.abs(qty).toLocaleString()} units.`,false);
+    company.companyCash-=value;
+    state.commodityInventory[raw]=(state.commodityInventory[raw]||0)+qty;
+    addLedger(`Bought ${qty.toLocaleString()} units of ${raw}`,-value*1000000);
+    empireMessage(`Bought ${qty.toLocaleString()} units of ${raw} for $${value.toFixed(3)}m.`,true);
+  } else {
+    const owned=state.commodityInventory[raw]||0, sellQty=Math.min(owned,Math.abs(qty));
+    if (sellQty<=0) return empireMessage(`No ${raw} inventory available to sell.`,false);
+    state.commodityInventory[raw]=owned-sellQty;
+    const proceeds=price*sellQty*.96/1000000;
+    company.companyCash+=proceeds;
+    addLedger(`Sold ${sellQty.toLocaleString()} units of ${raw}`,proceeds*1000000);
+    empireMessage(`Sold ${sellQty.toLocaleString()} units of ${raw} for $${proceeds.toFixed(3)}m.`,true);
+  }
+  playCue(qty>0?"click":"win");
+  render();
+}
+
+function renderCommodityExchange(selectedFacility) {
+  const selectedRaw=selectedFacility ? productLines[selectedFacility.line].raw : null;
+  return `<div class="commodity-exchange">
+    <header><div><h3>Raw-material exchange</h3><p>Buy inputs for factories or sell surplus raw inventory.</p></div><strong>${money.format(companies[0].companyCash*1000000)} company cash</strong></header>
+    <div class="commodity-list">
+      ${commodityCatalog().slice(0,8).map(item=>{
+        const owned=state.commodityInventory[item.raw]||0, price=commodityPrice(item.raw), active=item.raw===selectedRaw;
+        return `<article class="${active?"active":""}">
+          ${guideArt(item.raw,item.name)}
+          <div><strong>${item.name}</strong><span>${money.format(price)} / unit</span><small>Warehouse: ${owned.toLocaleString()}</small></div>
+          <button data-buy-commodity="${item.raw}">Buy 100</button>
+          <button data-sell-commodity="${item.raw}" ${owned<1?"disabled":""}>Sell 100</button>
+        </article>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
 function empireMessage(text,good) {
   const el=document.querySelector("#empire-status");
   if (el) { el.textContent=text; el.className=good?"up":"down"; }
@@ -753,7 +812,8 @@ function sellFacility(id,demolish=false) {
 
 function runFacilities() {
   if (!Array.isArray(state.facilities) || !state.facilities.length) return;
-  const company=companies[0], settings=difficultySettings(), rawPool={}, finishedPool={};
+  ensureStateDefaults();
+  const company=companies[0], settings=difficultySettings(), rawPool={...state.commodityInventory}, finishedPool={};
   // GAME BALANCE TUNING:
   // Facilities use the same difficulty knobs as Nova operations. Easy gives
   // friendlier demand and lower cost pressure; Hard makes supply mistakes expensive.
@@ -808,6 +868,7 @@ function runFacilities() {
       facility.profit=sales-marketing; facility.lastUnits=sold;
     }
   });
+  state.commodityInventory=rawPool;
   company.dailyOperatingProfit+=profit;
   company.dailyRevenue+=revenue;
   company.marketShare=Math.min(.68,company.marketShare+units/500000);
@@ -2492,7 +2553,7 @@ function renderFirmView() {
     facility=state.facilities[0];
     state.selectedFacilityId=facility.id;
   }
-  const slots=document.querySelector("#firm-product-slots"), info=document.querySelector("#firm-info"), building=document.querySelector("#firm-building");
+  const slots=document.querySelector("#firm-product-slots"), info=document.querySelector("#firm-info"), building=document.querySelector("#firm-building"), ops=document.querySelector("#firm-ops-panel");
   if (!facility) {
     identity.innerHTML=`${playerBrandMarkup(true)}<div><strong>Choose your first firm</strong><span>Build a factory, store, or industry to activate this operations screen.</span></div>`;
     document.querySelector("#firm-profit").textContent="$0";
@@ -2505,9 +2566,12 @@ function renderFirmView() {
       <article><strong>Industry</strong><span>Create raw materials for your supply chain.</span><button data-quick-build="industry">Build industry</button></article>
     </div>`;
     info.innerHTML="<h3>Firm operations</h3><p>This area becomes your hands-on business screen. After building a firm you can set prices, production targets, marketing, upgrades, and exits.</p>";
+    if (ops) ops.innerHTML=`<h3>Start building gameplay</h3><p>Build one firm above, then this space becomes your live price, production, marketing, and raw-material trading desk.</p>${renderCommodityExchange(null)}`;
     building.className="firm-building firm-idle";
     ["#firm-upgrade","#firm-market","#firm-sell","#firm-demolish"].forEach(selector=>{const button=document.querySelector(selector); if(button)button.disabled=true;});
     slots.querySelectorAll("[data-quick-build]").forEach(button=>button.onclick=event=>{event.stopPropagation(); quickBuildFacility(button.dataset.quickBuild);});
+    document.querySelectorAll("[data-buy-commodity]").forEach(button=>button.onclick=()=>tradeCommodity(button.dataset.buyCommodity,100));
+    document.querySelectorAll("[data-sell-commodity]").forEach(button=>button.onclick=()=>tradeCommodity(button.dataset.sellCommodity,-100));
     return;
   }
   ["#firm-upgrade","#firm-market","#firm-sell","#firm-demolish"].forEach(selector=>{const button=document.querySelector(selector); if(button)button.disabled=false;});
@@ -2520,13 +2584,27 @@ function renderFirmView() {
   document.querySelector("#firm-profit-spark").innerHTML=renderSparkBars(profit,profit>=0);
   document.querySelector("#firm-revenue-spark").innerHTML=renderSparkBars(revenue,true);
   const productSlots=[
-    {name:line.input,label:"Input",units:role==="industry"?facility.rawInventory:facility.rawInventory,quality:70},
-    {name:line.output,label:role==="industry"?"Extracted":"Output",units:role==="store"?facility.finishedInventory:facility.lastUnits,quality:Math.min(95,55+facility.level*8)},
-    {name:"Marketing",label:"Demand",units:facility.marketing,quality:Math.min(100,facility.marketing)},
-    {name:"Service",label:"Store quality",units:facility.level,quality:Math.min(100,45+facility.level*14)}
+    {key:line.raw,name:line.input,label:"Input",units:(state.commodityInventory[line.raw]||0)+facility.rawInventory,quality:70},
+    {key:facility.line,name:line.output,label:role==="industry"?"Extracted":"Output",units:role==="store"?facility.finishedInventory:facility.lastUnits,quality:Math.min(95,55+facility.level*8)},
+    {key:"marketing",name:"Marketing",label:"Demand",units:facility.marketing,quality:Math.min(100,facility.marketing)},
+    {key:"service",name:"Service",label:"Store quality",units:facility.level,quality:Math.min(100,45+facility.level*14)}
   ];
-  slots.innerHTML=productSlots.map(slot=>`<article class="firm-slot"><div class="firm-slot-art">${slot.name.slice(0,2).toUpperCase()}</div><div><strong>${slot.name}</strong><span>${slot.label}</span><small>${Number(slot.units).toLocaleString()} units</small></div><i style="--q:${slot.quality}%"></i></article>`).join("");
+  slots.innerHTML=productSlots.map(slot=>`<article class="firm-slot">${guideArt(slot.key,slot.name)}<div><strong>${slot.name}</strong><span>${slot.label}</span><small>${Number(slot.units).toLocaleString()} units</small></div><i style="--q:${slot.quality}%"></i></article>`).join("");
   building.className=`firm-building firm-${role}`;
+  const priceMin=Math.max(1,Math.round(line.unitCost*1.05)), priceMax=Math.round(line.unitPrice*1.75), capacityMax=facilityBlueprints[facility.type].capacity*facility.level;
+  if (ops) ops.innerHTML=`<div class="firm-ops-controls">
+      <header><div><h3>Operate this firm</h3><p>These controls update the selected firm immediately.</p></div><button data-scroll-facility="${facility.id}">Open full card</button></header>
+      <label>Price <strong>${money.format(metrics.price)}</strong><input data-firm-live-control="${facility.id}" data-field="price" type="range" min="${priceMin}" max="${priceMax}" step="1" value="${Math.round(metrics.price)}"></label>
+      <label>Production target <strong>${metrics.capacity.toLocaleString()}/day</strong><input data-firm-live-control="${facility.id}" data-field="productionTarget" type="range" min="1" max="${capacityMax}" step="1" value="${Math.round(metrics.capacity)}"></label>
+      <label>Marketing <strong>$${facility.marketing}k/day</strong><input data-firm-live-control="${facility.id}" data-field="marketing" type="range" min="0" max="300" step="5" value="${facility.marketing}"></label>
+      <div class="firm-flow">
+        <span>${line.input}<strong>${((state.commodityInventory[line.raw]||0)+facility.rawInventory).toLocaleString()}</strong></span>
+        <i></i>
+        <span>${line.output}<strong>${(facility.finishedInventory||0).toLocaleString()}</strong></span>
+        <i></i>
+        <span>Sales forecast<strong>${metrics.possibleUnits.toLocaleString()}</strong></span>
+      </div>
+    </div>${renderCommodityExchange(facility)}`;
   info.innerHTML=`<h3>${blueprint.name}</h3><p>${line.input} -> ${line.output}</p>
     <div class="firm-info-grid">
       <span>Level<strong>${facility.level}</strong></span>
@@ -2552,6 +2630,13 @@ function renderFirmView() {
   document.querySelector("#firm-market").onclick=()=>marketFacility(facility.id);
   document.querySelector("#firm-sell").onclick=()=>sellFacility(facility.id,false);
   document.querySelector("#firm-demolish").onclick=()=>sellFacility(facility.id,true);
+  document.querySelectorAll("[data-firm-live-control]").forEach(input=>input.onchange=event=>updateFacilityStrategy(+input.dataset.firmLiveControl,input.dataset.field,event.target.value));
+  document.querySelectorAll("[data-buy-commodity]").forEach(button=>button.onclick=()=>tradeCommodity(button.dataset.buyCommodity,100));
+  document.querySelectorAll("[data-sell-commodity]").forEach(button=>button.onclick=()=>tradeCommodity(button.dataset.sellCommodity,-100));
+  document.querySelectorAll("[data-scroll-facility]").forEach(button=>button.onclick=()=>{
+    const card=document.querySelector(`[data-select-facility="${button.dataset.scrollFacility}"]`);
+    if (card) { card.scrollIntoView({behavior:"smooth",block:"center"}); card.classList.add("attention-pulse"); setTimeout(()=>card.classList.remove("attention-pulse"),900); }
+  });
 }
 
 function renderFacilities() {
