@@ -17,6 +17,8 @@ main { padding:18px 34px 30px 112px; }
 .mission-card { grid-column:1/-1; display:grid; grid-template-columns:1fr 1.1fr 1.1fr; gap:18px; border-top:1px solid var(--line); background:linear-gradient(120deg,#061a3c,#0a3d86); }
 .mission-card h2 { color:#fff6a5; margin:2px 0 8px; }
 .mission-card p { color:#c7e4ff; }
+.task-picker { display:block; margin-top:14px; color:#9ed3ff; font-size:12px; }
+.task-picker select { width:100%; margin-top:6px; padding:9px 10px; color:#edf3fa; background:#061b41; border:2px ridge #49a3f3; border-radius:12px; }
 .mission-objectives { display:grid; gap:8px; }
 .mission-objective { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:9px 11px; border:1px solid #347fd0; border-radius:12px; background:#041936; }
 .mission-objective strong { color:#ffbf24; }

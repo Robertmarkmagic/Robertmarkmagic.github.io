@@ -45,9 +45,10 @@
       <div class="dashboard-movers"><h3>Top movers</h3><div id="top-movers"></div></div>
       <div class="mission-card">
         <div>
-          <p class="eyebrow" id="mission-kicker">LEARN BUSINESS</p>
+          <p class="eyebrow" id="mission-kicker">OPTIONAL TASKS</p>
           <h2 id="mission-title"></h2>
           <p id="mission-description"></p>
+          <label class="task-picker">Choose challenge<select id="task-select"></select></label>
         </div>
         <div id="mission-objectives" class="mission-objectives"></div>
         <div class="mission-report">
@@ -85,7 +86,7 @@
     </section>
 
     <section class="progression panel">
-      <div class="panel-title"><div><h2>Investor Progression</h2><span>Grow your account or build experience to unlock advanced finance</span></div><strong id="progression-status"></strong></div>
+      <div class="panel-title"><div><h2>Advanced Systems</h2><span>Everything is available from the start; use this as a quick system checklist</span></div><strong id="progression-status"></strong></div>
       <div id="progression-list" class="progression-list"></div>
     </section>
 
@@ -286,7 +287,7 @@
           <div><span>Choose face</span><div class="choice-row portrait-grid" id="avatar-choices"><button data-avatar="founder-a" class="active"><i class="avatar-chip founder-a"></i></button><button data-avatar="founder-b"><i class="avatar-chip founder-b"></i></button><button data-avatar="founder-c"><i class="avatar-chip founder-c"></i></button><button data-avatar="founder-d"><i class="avatar-chip founder-d"></i></button><button data-avatar="founder-e"><i class="avatar-chip founder-e"></i></button><button data-avatar="founder-f"><i class="avatar-chip founder-f"></i></button><button data-avatar="founder-g"><i class="avatar-chip founder-g"></i></button><button data-avatar="founder-h"><i class="avatar-chip founder-h"></i></button><button data-avatar="founder-i"><i class="avatar-chip founder-i"></i></button><button data-avatar="founder-j"><i class="avatar-chip founder-j"></i></button></div></div>
           <div><span>Choose logo</span><div class="choice-row logo-grid" id="logo-choices"><button data-logo="logo-a" class="active"><i class="logo-chip logo-a"></i></button><button data-logo="logo-b"><i class="logo-chip logo-b"></i></button><button data-logo="logo-c"><i class="logo-chip logo-c"></i></button><button data-logo="logo-d"><i class="logo-chip logo-d"></i></button><button data-logo="logo-e"><i class="logo-chip logo-e"></i></button><button data-logo="logo-f"><i class="logo-chip logo-f"></i></button><button data-logo="logo-g"><i class="logo-chip logo-g"></i></button><button data-logo="logo-h"><i class="logo-chip logo-h"></i></button><button data-logo="logo-i"><i class="logo-chip logo-i"></i></button><button data-logo="logo-j"><i class="logo-chip logo-j"></i></button></div></div>
         </div>
-        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>The first campaign starts with a short guided tour.</span></div></div>
+        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>Start with a full game guide, then play freely with all systems unlocked.</span></div></div>
         <div class="cloud-panel" aria-label="Cloud account">
           <div><strong>Cloud account</strong><span id="cloud-status">Setup required: add your Supabase URL and anon key to enable email signup.</span></div>
           <label>Email<input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
@@ -294,7 +295,7 @@
           <label class="mailing-consent"><input id="auth-mailing-list" type="checkbox" checked> Add me to the Market Foundry email list</label>
           <div class="cloud-actions"><button id="auth-sign-up">Sign up</button><button id="auth-sign-in">Sign in</button><button id="auth-resend">Resend email</button><button id="auth-reset">Reset password</button><button id="auth-sign-out">Sign out</button></div>
         </div>
-        <div class="launch-actions"><button id="launch-start" class="primary">Start guided campaign</button><button id="launch-expert">I am an expert. Unlock everything.</button><button id="launch-load">Load saved game</button><button id="launch-explore">Explore current board</button></div>
+        <div class="launch-actions"><button id="launch-start" class="primary">Start game with startup guide</button><button id="launch-expert">Start without guide</button><button id="launch-load">Load saved game</button><button id="launch-explore">Explore current board</button></div>
       </div>
     </div>
   </div>
