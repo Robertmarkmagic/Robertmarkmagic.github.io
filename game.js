@@ -63,6 +63,7 @@ const state = {
   player:{name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"},
   facilities:[],
   selectedFacilityId:null,
+  bankDebt:0, bankRate:.085, lastBankInterest:0,
   missions:{selected:"save-nova", completed:[], profitableDays:0, lastProfitDay:0, priceAdjusted:false, productionAdjusted:false, marketingAdjusted:false, researchAdjusted:false},
   autoTime:{running:false,speed:1,accumulator:0}
 };
@@ -351,6 +352,9 @@ function ensureStateDefaults() {
   if (!Array.isArray(state.facilities)) state.facilities=[];
   if (!state.selectedFacilityId && state.facilities[0]) state.selectedFacilityId=state.facilities[0].id;
   if (state.selectedFacilityId && !state.facilities.some(f=>f.id===state.selectedFacilityId)) state.selectedFacilityId=state.facilities[0]?.id || null;
+  if (!Number.isFinite(state.bankDebt)) state.bankDebt=0;
+  if (!Number.isFinite(state.bankRate)) state.bankRate=.085;
+  if (!Number.isFinite(state.lastBankInterest)) state.lastBankInterest=0;
   if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
   ensureMissionDefaults();
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
@@ -400,6 +404,7 @@ function advanceDay(renderAfter=true) {
   if (state.gameOver) return false;
   state.dayStartEquity=accountEquity();
   state.day++;
+  accrueBankInterest();
   updateEconomy();
   updateTakeoverMarket();
   runFacilities();
@@ -1296,6 +1301,62 @@ function votingOwnership() {
 
 function hasControl() { return votingOwnership()>.5; }
 
+function bankCreditLimit() {
+  const assets=Math.max(0,state.cash+portfolioValue());
+  const equity=Math.max(0,accountEquity());
+  return Math.max(50000,Math.min(750000,assets*.55+equity*.35));
+}
+
+function availableBankCredit() {
+  return Math.max(0,bankCreditLimit()-(state.bankDebt||0));
+}
+
+function updateBankRate() {
+  const debtRatio=(state.bankDebt||0)/Math.max(1,bankCreditLimit());
+  state.bankRate=Math.max(.06,state.economy.interestRate+.045+debtRatio*.045);
+}
+
+function accrueBankInterest() {
+  ensureStateDefaults();
+  if (!state.bankDebt) { state.lastBankInterest=0; return; }
+  updateBankRate();
+  const interest=state.bankDebt*state.bankRate/TRADING_DAYS_PER_YEAR;
+  state.cash-=interest;
+  state.lastBankInterest=interest;
+  if (state.day%20===0) addLedger("Bank loan interest",-interest);
+}
+
+function bankAction(action, amountValue) {
+  ensureStateDefaults();
+  updateBankRate();
+  const requested=amountValue==="max"?state.cash:Math.max(0,+amountValue||0);
+  if (action==="borrow") {
+    const amount=Math.min(requested,availableBankCredit());
+    if (amount<1) return bankMessage("The bank will not extend more credit right now. Improve net worth or repay debt first.",false);
+    state.cash+=amount;
+    state.bankDebt+=amount;
+    updateBankRate();
+    addLedger("Bank loan received",amount);
+    bankMessage(`Borrowed ${money.format(amount)}. Cash available increased, but bank debt reduces net worth.`,true);
+  } else if (action==="repay") {
+    const amount=Math.min(requested,state.cash,state.bankDebt||0);
+    if (amount<1) return bankMessage("No bank debt can be repaid right now.",false);
+    state.cash-=amount;
+    state.bankDebt-=amount;
+    if (state.bankDebt<1) state.bankDebt=0;
+    updateBankRate();
+    addLedger("Bank loan repaid",-amount);
+    bankMessage(`Repaid ${money.format(amount)} of bank debt.`,true);
+  }
+  render();
+}
+
+function bankMessage(text,good) {
+  const el=document.querySelector("#bank-message");
+  if (el) { el.textContent=text; el.className=good?"up":"down"; }
+  message(text,good);
+}
+
 function corporateFinanceAction(action) {
   const company=companies[0];
   if (!hasControl()) return financeMessage("The board has removed you from control. Buy Nova shares to regain a majority.",false);
@@ -1371,7 +1432,7 @@ function launchProduct(index) {
 function stockPortfolioValue(){ return companies.reduce((sum,c)=>sum+(state.holdings[c.ticker]||0)*c.price,0); }
 function optionsPortfolioValue(){ return state.optionPositions.reduce((sum,position)=>sum+optionPositionValue(position),0); }
 function portfolioValue(){ return stockPortfolioValue()+optionsPortfolioValue(); }
-function accountEquity(){ return state.cash+portfolioValue(); }
+function accountEquity(){ return state.cash+portfolioValue()-(state.bankDebt||0); }
 function pct(value){ return `${value>=0?"+":""}${(value*100).toFixed(2)}%`; }
 function message(text,good){ const el=document.querySelector("#trade-message"); el.textContent=text; el.className=good?"up":"down"; }
 
@@ -1571,6 +1632,10 @@ function renderDashboard(worth,investments) {
   const hero=document.querySelector("#hero-net-worth"),previous=Number(hero.dataset.value||worth),dailyPnl=worth-(state.dayStartEquity||state.startWorth);
   renderPlayerBrand();
   hero.textContent=money.format(worth); hero.dataset.value=worth;
+  document.querySelector("#hero-cash-available").textContent=money.format(state.cash);
+  const heroBank=document.querySelector("#hero-bank-debt");
+  heroBank.textContent=money.format(state.bankDebt||0);
+  heroBank.className=state.bankDebt?"down":"";
   if (Math.abs(worth-previous)>.01) {
     hero.className=worth>previous?"flash-up":"flash-down";
     setTimeout(()=>hero.className="",320);
@@ -1665,12 +1730,14 @@ function renderChart(company) {
 function render() {
   ensureStateDefaults();
   checkProgression();
-  const company=companies[state.selected], investments=portfolioValue(), worth=state.cash+investments, change=(company.price-company.previous)/company.previous;
+  const company=companies[state.selected], investments=portfolioValue(), worth=accountEquity(), change=(company.price-company.previous)/company.previous;
   document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}, Q${Math.floor(((state.day-1)%TRADING_DAYS_PER_YEAR)/60)+1}, Day ${state.day}`;
   document.querySelector("#time-toggle").textContent=state.autoTime.running?"Pause time":"Start time";
   document.querySelector("#time-speed").value=String(state.autoTime.speed||1);
   companies[0].name=state.player.companyName||companies[0].name;
   document.querySelector("#cash").textContent=money.format(state.cash); document.querySelector("#investments").textContent=money.format(investments); document.querySelector("#net-worth").textContent=money.format(worth);
+  document.querySelector("#bank-debt").textContent=money.format(state.bankDebt||0);
+  document.querySelector("#bank-debt").className=state.bankDebt?"down":"";
   const returnEl=document.querySelector("#return"); returnEl.textContent=pct(worth/state.startWorth-1); returnEl.className=worth>=state.startWorth?"up":"down";
   document.querySelector("#stock-list").innerHTML=companies.map((c,i)=>{const ch=(c.price-c.previous)/c.previous;return `<button class="stock ${i===state.selected?"active":""}" data-index="${i}"><span><strong>${c.ticker}</strong><small>${c.name}</small></span><span class="stock-price"><strong>${money.format(c.price)}</strong><small class="${ch>=0?"up":"down"}">${pct(ch)}</small></span></button>`}).join("");
   document.querySelectorAll(".stock").forEach(el=>el.onclick=()=>{selectCompany(+el.dataset.index); message("",true); playCue("click");});
@@ -2142,6 +2209,7 @@ function renderFacilities() {
 
 function renderFinance() {
   const c=companies[0], ownership=votingOwnership(), controlled=hasControl();
+  updateBankRate();
   const publicShares=c.totalShares-c.founderShares;
   document.querySelector("#control-status").textContent=controlled?"Board controlled":"Control lost";
   document.querySelector("#control-status").className=controlled?"up":"down";
@@ -2159,6 +2227,15 @@ function renderFinance() {
   ];
   document.querySelector("#finance-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
   document.querySelectorAll("[data-finance-action]").forEach(button=>button.disabled=!controlled);
+  const bankLimit=bankCreditLimit(), available=availableBankCredit();
+  document.querySelector("#bank-kpis").innerHTML=[
+    ["Cash available",money.format(state.cash),state.cash>0],
+    ["Bank debt",money.format(state.bankDebt||0),!state.bankDebt],
+    ["Credit line",money.format(bankLimit),available>0],
+    ["Available credit",money.format(available),available>0],
+    ["Loan rate",pct(state.bankRate),state.bankRate<.11],
+    ["Daily interest",money.format((state.bankDebt||0)*state.bankRate/TRADING_DAYS_PER_YEAR),!(state.bankDebt>0)]
+  ].map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
   if(!controlled && !document.querySelector("#finance-message").textContent) financeMessage("Buy additional Nova shares in the market to rebuild a majority voting stake.",false);
 }
 
@@ -2261,6 +2338,7 @@ document.querySelectorAll("[data-quick-size]").forEach(button=>button.onclick=()
 });
 document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
 [...document.querySelectorAll("[data-finance-action]")].forEach(button=>button.onclick=()=>corporateFinanceAction(button.dataset.financeAction));
+[...document.querySelectorAll("[data-bank-action]")].forEach(button=>button.onclick=()=>bankAction(button.dataset.bankAction,button.dataset.bankAmount));
 ["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>{markMissionInput(id);refreshDecisionLabels();});
 document.querySelector("#task-select").onchange=event=>{ensureMissionDefaults();state.missions.selected=event.target.value;state.advisorHidden=false;render();};
 window.addEventListener("keydown",handleKeyboard);

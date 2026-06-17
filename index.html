@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=logo-fix-4118e58">
+  <link rel="stylesheet" href="styles.css?v=bank-credit-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -38,6 +38,10 @@
         <span>Total portfolio value</span>
         <strong id="hero-net-worth"></strong>
         <div id="hero-daily-pnl" class="hero-pnl"></div>
+        <div class="hero-cash-grid">
+          <div><span>Cash available to buy</span><strong id="hero-cash-available"></strong></div>
+          <div><span>Bank debt</span><strong id="hero-bank-debt"></strong></div>
+        </div>
         <div id="equity-sparkline" class="equity-sparkline"></div>
       </div>
       <div class="allocation-wrap">
@@ -61,12 +65,13 @@
     </section>
 
     <section class="metrics" aria-label="Portfolio summary">
-      <article><span>Cash</span><strong id="cash"></strong></article>
+      <article><span>Cash available</span><strong id="cash"></strong></article>
       <article><span>Investments</span><strong id="investments"></strong></article>
       <article><span>Net worth</span><strong id="net-worth"></strong></article>
       <article><span>Return</span><strong id="return"></strong></article>
       <article><span>Buying power</span><strong id="buying-power"></strong></article>
       <article><span>Margin used</span><strong id="margin-used"></strong></article>
+      <article><span>Bank debt</span><strong id="bank-debt"></strong></article>
       <article><span>Today's trades</span><strong id="trades-today"></strong></article>
       <article><span>Open orders</span><strong id="orders-count"></strong></article>
     </section>
@@ -258,6 +263,18 @@
           <button data-finance-action="issue">Issue 50k shares<small>Raises cash, dilutes owners</small></button>
           <button data-finance-action="buyback">Buy back 25k shares<small>Uses cash, concentrates control</small></button>
         </div>
+        <div class="bank-panel">
+          <h3>Bank credit</h3>
+          <p>Borrow cash for your trading account. Loans increase cash available to buy, but bank debt reduces net worth and charges daily interest.</p>
+          <div id="bank-kpis" class="bank-kpis"></div>
+          <div class="bank-actions">
+            <button data-bank-action="borrow" data-bank-amount="25000">Borrow $25k</button>
+            <button data-bank-action="borrow" data-bank-amount="100000">Borrow $100k</button>
+            <button data-bank-action="repay" data-bank-amount="25000">Repay $25k</button>
+            <button data-bank-action="repay" data-bank-amount="max">Repay max</button>
+          </div>
+          <p id="bank-message"></p>
+        </div>
         <div class="management-note">
           <h3>Board control</h3>
           <p>Keep more than 50% of voting shares to control daily management. Shares bought in your portfolio count toward your vote; short positions do not.</p>
@@ -332,6 +349,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=logo-fix-4118e58"></script>
+  <script src="game.js?v=bank-credit-v1"></script>
 </body>
 </html>
