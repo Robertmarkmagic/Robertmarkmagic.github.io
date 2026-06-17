@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=guide-gameplay-v1">
+  <link rel="stylesheet" href="styles.css?v=learning-track-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -54,7 +54,9 @@
           <p class="eyebrow" id="mission-kicker">OPTIONAL TASKS</p>
           <h2 id="mission-title"></h2>
           <p id="mission-description"></p>
-          <label class="task-picker">Choose challenge<select id="task-select"></select></label>
+          <div class="task-mode-toggle"><button data-board-mode="challenge">Challenges</button><button data-board-mode="learn">Learn</button></div>
+          <label class="task-picker" id="challenge-picker">Choose challenge<select id="task-select"></select></label>
+          <label class="task-picker" id="lesson-picker">Learn about<select id="lesson-select"></select></label>
         </div>
         <div id="mission-objectives" class="mission-objectives"></div>
         <div class="mission-report">
@@ -354,6 +356,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=guide-gameplay-v1"></script>
+  <script src="game.js?v=learning-track-v1"></script>
 </body>
 </html>

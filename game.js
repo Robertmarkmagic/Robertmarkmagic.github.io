@@ -152,6 +152,18 @@ const learningMissions = [
   {id:"build-empire",title:"Build Your Empire",description:"Run at least two active business assets: a second facility, a second product line, or a larger upgraded operation.",reward:"Practice advanced expansion.",unlock:"Finance + Options + M&A"}
 ];
 
+const learningTracks = [
+  {id:"market-basics",title:"Economy and Market Cycles",description:"Learn how confidence, inflation, interest rates, fuel costs, and news move demand and valuations.",case:"A recession warning hits. Do you cut prices to defend volume, or protect margin and accept lower sales?",takeaway:"The market is not random noise. Rates compress valuations, inflation raises costs, and confidence changes customer demand.",levels:["Read the World Economy panel.","Watch one market ripple after news.","Advance one week and compare sectors."],jump:"#economy",jumpLabel:"Open economy panel"},
+  {id:"stocks",title:"Stocks and Portfolio Risk",description:"Learn why stock price, business quality, sector exposure, and position size matter.",case:"You like one hot tech stock. Do you put everything into it, or spread capital across sectors?",takeaway:"A stock is ownership in a business. Price movement matters, but concentration risk can hurt even when your idea is good.",levels:["Buy a small stock position.","Close it using the Close button.","Compare portfolio value with cash."],jump:"#trading",jumpLabel:"Open trading desk"},
+  {id:"options",title:"Options: Risk, Leverage, and Time",description:"Learn calls, puts, break-even, expiry, and why cheap options can still be expensive mistakes.",case:"A stock may jump after earnings. Do you buy shares, a safer call, or a cheap lotto call that expires soon?",takeaway:"Options are time-limited bets. You can only lose the premium, but time decay means being right too late can still lose.",levels:["Try Bullish bet, Bearish hedge, and Cheap lotto.","Read the 10-day scenario preview.","Buy one contract and close it."],jump:".options",jumpLabel:"Open options lab"},
+  {id:"pricing",title:"Pricing and Demand",description:"Learn how price changes demand, margin, inventory, and customer satisfaction.",case:"You sell coffee. Do you buy cheaper beans for higher margin, or better beans for better reviews and demand?",takeaway:"Profit is not just high price. It is price multiplied by demand, minus cost, marketing, production, and inventory waste.",levels:["Change product price.","Watch demand and inventory.","Advance time and compare profit."],jump:"#operations",jumpLabel:"Open operations"},
+  {id:"production",title:"Production and Inventory",description:"Learn how factories turn cash into stock, and why too much inventory can trap money.",case:"Demand is uncertain. Do you produce aggressively to avoid empty shelves, or produce carefully to protect cash?",takeaway:"Production is a bet on future demand. Stockouts lose sales, but excess inventory creates holding cost and cash pressure.",levels:["Set production target.","Check inventory days.","Run one week and review profit."],jump:"#operations",jumpLabel:"Open production controls"},
+  {id:"supply-chain-course",title:"Supply Chain: Input to Store",description:"Learn the core tycoon loop: buy raw materials, manufacture goods, and sell through the right store.",case:"Your factory can make shirts, but stores cannot sell fast enough. Do you build more retail, cut production, or push marketing?",takeaway:"A chain is only as strong as its bottleneck. Raw input, factory output, retail capacity, and demand must fit together.",levels:["Use Manufacturer's Guide.","Build raw industry, factory, or seller.","Check the bottleneck message."],jump:"#empire",jumpLabel:"Open empire and guide"},
+  {id:"logistics",title:"Transport and Logistics",description:"Learn the next layer: delivery time, supplier quality, delays, depots, import/export, tariffs, currency, and crises.",case:"A cheaper overseas supplier saves 18%, but shipping takes longer and can be delayed. Do you switch?",takeaway:"Logistics trades cost against reliability. Later versions can add depots, import routes, tariffs, and crisis events.",levels:["Start with local supply.","Compare margin versus reliability.","Build spare capacity before expanding."],jump:"#empire",jumpLabel:"Open supply chain"},
+  {id:"competition",title:"Competition and Moats",description:"Learn how competitor prices, quality, brand, marketing, and capacity shape your market share.",case:"A rival cuts prices. Do you match them, improve quality, spend on marketing, or retreat to a premium niche?",takeaway:"Competition is not one variable. Winning can mean lower cost, stronger brand, better availability, or a smarter segment.",levels:["Compare your price with competitor price.","Improve marketing or quality.","Track market share."],jump:"#operations",jumpLabel:"Open competitor view"},
+  {id:"trading-goods",title:"Buying and Selling Goods",description:"Learn merchant gameplay: buy low, sell high, manage stock, and avoid tying cash up in slow products.",case:"Cleaning goods have high demand but low margin. Jewelry has high margin but slow turnover. Which store do you build first?",takeaway:"Retail is cash velocity. A lower-margin product can beat a luxury product if it sells faster and needs less capital.",levels:["Pick a product in Manufacturer's Guide.","Build a seller.","Watch sales, inventory, and profit."],jump:"#empire",jumpLabel:"Open product guide"}
+];
+
 function featureUnlocked(id) {
   return true;
 }
@@ -1545,6 +1557,8 @@ function ensureMissionDefaults() {
   if (!state.mode || state.mode==="open") state.mode="guided";
   if (!state.missions) state.missions={};
   if (!state.missions.selected) state.missions.selected="save-nova";
+  if (!state.missions.boardMode) state.missions.boardMode="challenge";
+  if (!state.missions.selectedLesson) state.missions.selectedLesson="market-basics";
   if (!Array.isArray(state.missions.completed)) state.missions.completed=[];
   state.missions.profitableDays=state.missions.profitableDays||0;
   state.missions.lastProfitDay=state.missions.lastProfitDay||0;
@@ -1554,6 +1568,16 @@ function ensureMissionDefaults() {
 function currentMission() {
   ensureMissionDefaults();
   return learningMissions.find(mission=>mission.id===state.missions.selected) || learningMissions[0];
+}
+
+function currentLesson() {
+  ensureMissionDefaults();
+  return learningTracks.find(lesson=>lesson.id===state.missions.selectedLesson) || learningTracks[0];
+}
+
+function jumpToLearningSystem(selector) {
+  const target=document.querySelector(selector);
+  if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 function businessSignals() {
@@ -1775,6 +1799,28 @@ function renderMissionDashboard() {
   ensureMissionDefaults();
   const mission=currentMission(), signals=businessSignals(), c=companies[0];
   const completed=state.missions.completed.includes(mission.id), number=learningMissions.findIndex(item=>item.id===mission.id)+1;
+  const learnMode=state.missions.boardMode==="learn", lesson=currentLesson();
+  document.querySelectorAll("[data-board-mode]").forEach(button=>button.classList.toggle("active",button.dataset.boardMode===(learnMode?"learn":"challenge")));
+  document.querySelector("#challenge-picker").classList.toggle("hidden",learnMode);
+  document.querySelector("#lesson-picker").classList.toggle("hidden",!learnMode);
+  const lessonSelector=document.querySelector("#lesson-select");
+  if (lessonSelector) lessonSelector.innerHTML=learningTracks.map(item=>`<option value="${item.id}" ${item.id===lesson.id?"selected":""}>${item.title}</option>`).join("");
+  if (learnMode) {
+    document.querySelector("#mission-kicker").textContent="LEARN ON DEMAND - NO REQUIRED TUTORIAL";
+    document.querySelector("#mission-title").textContent=`Learn: ${lesson.title}`;
+    document.querySelector("#mission-description").textContent=lesson.description;
+    document.querySelector("#mission-objectives").innerHTML=lesson.levels.map((label,index)=>`<div class="mission-objective optional"><span>Level ${index+1}: ${label}</span><strong>Optional</strong></div>`).join("");
+    document.querySelector(".mission-report h3").textContent="Business lesson";
+    document.querySelector("#mission-report").innerHTML=[
+      ["Case",lesson.case],
+      ["Key idea",lesson.takeaway],
+      ["Try in game",lesson.jumpLabel],
+      ["Freedom","Play freely. Learn only when you choose it."]
+    ].map(item=>`<div class="lesson-cell"><span>${item[0]}</span><strong>${item[1]}</strong></div>`).join("")+`<button class="lesson-jump" data-lesson-jump="${lesson.jump}">${lesson.jumpLabel}</button>`;
+    document.querySelectorAll("[data-lesson-jump]").forEach(button=>button.onclick=()=>jumpToLearningSystem(button.dataset.lessonJump));
+    return;
+  }
+  document.querySelector(".mission-report h3").textContent="Business pulse";
   document.querySelector("#mission-kicker").textContent="OPEN PLAY - OPTIONAL TASKS";
   document.querySelector("#mission-title").textContent=`Challenge ${number}: ${mission.title}`;
   document.querySelector("#mission-description").textContent=`${mission.description} Reward: ${mission.reward}`;
@@ -2511,6 +2557,8 @@ document.querySelector("#apply-decisions").onclick=applyManagementDecisions;
 [...document.querySelectorAll("[data-bank-action]")].forEach(button=>button.onclick=()=>bankAction(button.dataset.bankAction,button.dataset.bankAmount));
 ["product-price","production","marketing","research"].forEach(id=>document.querySelector(`#${id}`).oninput=()=>{markMissionInput(id);refreshDecisionLabels();});
 document.querySelector("#task-select").onchange=event=>{ensureMissionDefaults();state.missions.selected=event.target.value;state.advisorHidden=false;render();};
+document.querySelector("#lesson-select").onchange=event=>{ensureMissionDefaults();state.missions.selectedLesson=event.target.value;state.missions.boardMode="learn";state.advisorHidden=true;render();};
+document.querySelectorAll("[data-board-mode]").forEach(button=>button.onclick=()=>{ensureMissionDefaults();state.missions.boardMode=button.dataset.boardMode;state.advisorHidden=button.dataset.boardMode==="challenge"?false:true;render();});
 window.addEventListener("keydown",handleKeyboard);
 setupTouchControls();
 window.addEventListener("resize",()=>renderChart(companies[state.selected])); bootstrapSavedMode(); render();

@@ -36,6 +36,9 @@ main { padding:18px 34px 30px 112px; }
 .mission-card p { color:#c7e4ff; }
 .task-picker { display:block; margin-top:14px; color:#9ed3ff; font-size:12px; }
 .task-picker select { width:100%; margin-top:6px; padding:9px 10px; color:#edf3fa; background:#061b41; border:2px ridge #49a3f3; border-radius:12px; }
+.task-mode-toggle { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
+.task-mode-toggle button { padding:9px 10px; background:#0b3b82; border:2px ridge #55aaff; color:#dcecff; }
+.task-mode-toggle button.active { background:linear-gradient(#16a34a,#087649); border-color:#00d68f; color:#fff; box-shadow:0 0 16px #00d68f55; }
 .save-copy-small { color:#9ed3ff!important; font-size:12px!important; }
 .local-save-panel { display:grid; gap:4px; padding:12px; background:#041737d9; border:2px ridge #4ea3ef; border-radius:14px; box-shadow:inset 0 0 18px #020b1d; }
 .local-save-panel strong { color:#fff6a6; }
@@ -55,6 +58,9 @@ main { padding:18px 34px 30px 112px; }
 #mission-report div { background:#061b41; padding:9px; }
 #mission-report span { display:block; color:#9ed3ff; font-size:11px; }
 #mission-report strong { font:800 14px Consolas,"Courier New",monospace; }
+#mission-report .lesson-cell { min-height:88px; }
+#mission-report .lesson-cell strong { font-family:inherit; font-size:13px; line-height:1.35; }
+.lesson-jump { grid-column:1/-1; padding:11px; background:var(--green); color:#06120d; border:0; font-weight:900; }
 .metrics { display:grid; grid-template-columns:repeat(8,1fr); gap:1px; border:1px solid var(--line); background:var(--line); border-radius:10px; overflow:hidden; margin-bottom:16px; }
 .metrics article { background:#101722; padding:15px 18px; } .metrics span { color:var(--muted); display:block; font-size:12px; } .metrics strong { font-size:21px; }
 .capital-command .metrics article { background:linear-gradient(180deg,#104d9e,#082d6c); } .capital-command .metrics span { color:#9ed3ff; } .capital-command .metrics strong { color:#fff6a5;text-shadow:1px 1px #001538; }
