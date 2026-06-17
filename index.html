@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=close-position-firm-v1">
+  <link rel="stylesheet" href="styles.css?v=options-fun-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -174,11 +174,16 @@
           <label>Contracts<input id="option-contracts" type="number" min="1" value="1"></label>
           <div class="estimate"><span>Premium per contract</span><strong id="option-premium"></strong></div>
           <div class="estimate"><span>Maximum loss</span><strong id="option-cost"></strong></div>
+          <div class="option-quick-ideas">
+            <button data-option-idea="bull">Bullish bet</button>
+            <button data-option-idea="bear">Bearish hedge</button>
+            <button data-option-idea="lotto">Cheap lotto</button>
+          </div>
           <button id="buy-option" class="primary">Buy call</button>
           <p id="option-message"></p>
         </div>
         <div><h3>Open option positions</h3><div id="option-positions" class="option-positions"></div></div>
-        <div class="management-note"><h3>Contract basics</h3><p>One contract controls 100 shares. Calls gain value above the strike; puts gain value below it. The premium declines as expiry approaches, and contracts settle automatically in cash.</p><p id="option-explanation"></p></div>
+        <div class="management-note option-lab"><h3>Option lab</h3><p>One contract controls 100 shares. Calls gain value above the strike; puts gain value below it. The premium declines as expiry approaches, and contracts settle automatically in cash.</p><div id="option-risk" class="option-risk"></div><div id="option-payoff" class="option-payoff"></div><p id="option-explanation"></p></div>
       </div>
     </section>
 
@@ -349,6 +354,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=close-position-firm-v1"></script>
+  <script src="game.js?v=options-fun-v1"></script>
 </body>
 </html>

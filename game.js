@@ -471,6 +471,51 @@ function optionUnitPrice(company,type,strike,days) {
   return Math.max(.05,intrinsic+timeValue+rateValue);
 }
 
+function optionScenarioValue(company,type,strike,days,contracts,priceMove) {
+  const scenarioCompany={...company,price:Math.max(.5,company.price*(1+priceMove))};
+  const nextDays=Math.max(0,days-10);
+  return optionUnitPrice(scenarioCompany,type,strike,nextDays)*100*contracts;
+}
+
+function optionRiskMetrics(company,type,strike,days,premium,contracts) {
+  const breakEven=type==="call"?strike+premium:strike-premium;
+  const moneyness=(company.price-strike)/company.price*(type==="call"?1:-1);
+  const timeRisk=1-Math.min(1,days/120);
+  const leverage=company.price*100*contracts/Math.max(1,premium*100*contracts);
+  const direction=type==="call"?"bullish":"bearish";
+  const riskScore=Math.max(5,Math.min(100,Math.round((company.volatility*520)+(Math.abs(moneyness)*90)+(timeRisk*25))));
+  const delta=Math.max(.05,Math.min(.95,.5+moneyness*2.2))*(type==="call"?1:-1);
+  return {breakEven,direction,riskScore,leverage,delta};
+}
+
+function chooseOptionIdea(kind) {
+  const company=companies[state.selected];
+  const strikeSelect=document.querySelector("#option-strike"), expirySelect=document.querySelector("#option-expiry"), contractsInput=document.querySelector("#option-contracts");
+  const strikes=Array.from(strikeSelect.options).map(option=>+option.value);
+  const nearest=target=>strikes.reduce((best,value)=>Math.abs(value-target)<Math.abs(best-target)?value:best,strikes[0]||Math.round(company.price));
+  if (kind==="bull") {
+    state.optionType="call";
+    strikeSelect.value=nearest(company.price*1.05);
+    expirySelect.value="60";
+    contractsInput.value=1;
+    optionMessage("Bullish bet loaded: a near-the-money call for upside without buying 100 shares.",true);
+  } else if (kind==="bear") {
+    state.optionType="put";
+    strikeSelect.value=nearest(company.price*.95);
+    expirySelect.value="60";
+    contractsInput.value=1;
+    optionMessage("Bearish hedge loaded: a put that gains if the stock drops.",true);
+  } else {
+    state.optionType="call";
+    strikeSelect.value=nearest(company.price*1.2);
+    expirySelect.value="20";
+    contractsInput.value=1;
+    optionMessage("Cheap lotto loaded: small premium, high risk, big upside only if the stock jumps fast.",true);
+  }
+  document.querySelectorAll("[data-option-type]").forEach(button=>button.classList.toggle("active",button.dataset.optionType===state.optionType));
+  render();
+}
+
 function buyOption() {
   if (!featureUnlocked("options")) return optionMessage("Options unlock at $125,000 net worth or day 50.",false);
   const company=companies[state.selected],type=state.optionType,strike=+document.querySelector("#option-strike").value,days=+document.querySelector("#option-expiry").value,contracts=Math.max(1,Math.floor(+document.querySelector("#option-contracts").value||1));
@@ -492,7 +537,9 @@ function sellOptionPosition(id) {
   if (index<0) return;
   const position=state.optionPositions[index],value=optionPositionValue(position);
   state.cash+=value; state.optionPositions.splice(index,1);
-  addLedger(`Closed ${position.ticker} ${position.type} options`,value); render();
+  addLedger(`Closed ${position.ticker} ${position.type} options`,value);
+  optionMessage(`Closed ${position.ticker} ${position.type.toUpperCase()} for ${money.format(value)}.`,true);
+  render();
 }
 
 function settleExpiredOptions() {
@@ -1867,12 +1914,29 @@ function renderOptions() {
   document.querySelector("#option-cost").textContent=money.format(cost);
   document.querySelector("#buy-option").textContent=`Buy ${contracts} ${type}${contracts>1?"s":""}`;
   const breakEven=type==="call"?strike+premium:strike-premium;
-  document.querySelector("#option-explanation").textContent=`Break-even at expiry: ${money.format(breakEven)}. ${days} days remain in the selected contract.`;
+  const risk=optionRiskMetrics(company,type,strike,days,premium,contracts);
+  const scenarios=[-.2,-.1,0,.1,.2].map(move=>{
+    const value=optionScenarioValue(company,type,strike,days,contracts,move),pl=value-cost;
+    return {move,value,pl};
+  });
+  const maxAbs=Math.max(...scenarios.map(item=>Math.abs(item.pl)),1);
+  document.querySelector("#option-risk").innerHTML=[
+    ["Direction",risk.direction.toUpperCase()],
+    ["Delta feel",`${risk.delta>0?"+":""}${risk.delta.toFixed(2)}`],
+    ["Leverage",`${risk.leverage.toFixed(1)}x`],
+    ["Risk",`${risk.riskScore}/100`]
+  ].map(([label,value])=>`<span><small>${label}</small><strong>${value}</strong></span>`).join("");
+  document.querySelector("#option-payoff").innerHTML=`<h3>10-day scenario preview</h3>${scenarios.map(item=>{
+    const width=Math.max(6,Math.round(Math.abs(item.pl)/maxAbs*100));
+    return `<div class="payoff-row"><span>${item.move>0?"+":""}${Math.round(item.move*100)}%</span><b class="${item.pl>=0?"up":"down"}">${money.format(item.pl)}</b><i class="${item.pl>=0?"win":"loss"}" style="--w:${width}%"></i></div>`;
+  }).join("")}`;
+  document.querySelector("#option-explanation").textContent=`Break-even at expiry: ${money.format(breakEven)}. ${days} days remain. You pay ${money.format(cost)} now; that is the maximum loss.`;
   document.querySelector("#option-positions").innerHTML=state.optionPositions.length?state.optionPositions.map(position=>{
-    const value=optionPositionValue(position),entry=position.entryPremium*100*position.contracts,pl=value-entry,remaining=Math.max(0,position.expiryDay-state.day);
-    return `<div class="option-position"><span><strong>${position.ticker} ${position.type.toUpperCase()}</strong><small>${position.contracts} contract${position.contracts>1?"s":""}</small></span><span>${money.format(position.strike)} strike</span><span>${remaining} days</span><span class="${pl>=0?"up":"down"}">${money.format(pl)}</span><button data-close-option="${position.id}">Close</button></div>`;
+    const value=optionPositionValue(position),entry=position.entryPremium*100*position.contracts,pl=value-entry,remaining=Math.max(0,position.expiryDay-state.day),underlying=companies.find(c=>c.ticker===position.ticker),intrinsic=position.type==="call"?Math.max(0,underlying.price-position.strike):Math.max(0,position.strike-underlying.price),plPct=entry?pl/entry:0;
+    return `<div class="option-position"><span><strong>${position.ticker} ${position.type.toUpperCase()}</strong><small>${position.contracts} contract${position.contracts>1?"s":""} @ ${money.format(position.strike)}</small></span><span>Value<strong>${money.format(value)}</strong></span><span>${remaining} days<small>${intrinsic>0?"in the money":"out of the money"}</small></span><span class="${pl>=0?"up":"down"}">${money.format(pl)}<small>${pct(plPct)}</small></span><button data-close-option="${position.id}">Close</button></div>`;
   }).join(""):`<p style="padding:14px 0;color:var(--muted)">No open option positions.</p>`;
   document.querySelectorAll("[data-close-option]").forEach(button=>button.onclick=()=>sellOptionPosition(+button.dataset.closeOption));
+  document.querySelectorAll("[data-option-idea]").forEach(button=>button.onclick=()=>chooseOptionIdea(button.dataset.optionIdea));
 }
 
 function renderFinancialReports() {
