@@ -346,6 +346,91 @@ input,select,textarea { font-size:16px; }
 
 #launch-modal { overflow-y:auto; overflow-x:hidden; }
 #launch-modal .launch-card,#launch-modal .launch-copy,#launch-modal .founder-setup,#launch-modal .launch-advisor,#launch-modal .cloud-panel { max-height:none; overflow:visible; }
+
+@media(max-width:700px){
+  header {
+    display:block;
+    padding:14px 12px 12px;
+    overflow:visible;
+  }
+  header > div:first-child {
+    margin-bottom:12px;
+  }
+  .capital-command h1 {
+    font-size:30px;
+    line-height:1.05;
+  }
+  .header-subtitle {
+    font-size:10px;
+  }
+  .clock {
+    width:100%;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    align-items:stretch;
+    justify-content:stretch;
+    overflow:visible;
+    padding:10px;
+    border:2px ridge #4ea3ef;
+    border-radius:16px;
+    background:linear-gradient(145deg,#061b43,#0a3c86);
+    box-shadow:inset 0 0 18px #00133799,0 10px 24px #0005;
+  }
+  .clock #date {
+    grid-column:1/-1;
+    display:block;
+    padding:8px 10px;
+    text-align:center;
+    color:#fff6a6;
+    background:#031936;
+    border:1px solid #347fd0;
+    border-radius:12px;
+    font:800 12px Consolas,"Courier New",monospace;
+  }
+  .clock button,
+  .clock select {
+    width:100%;
+    min-width:0;
+    min-height:48px;
+    padding:10px 8px;
+    border-radius:14px;
+    border:2px ridge #62b8ff;
+    color:#eaf6ff;
+    background:linear-gradient(180deg,#1669bd,#082e72);
+    box-shadow:inset 0 1px 0 #ffffff33,0 5px 12px #0005;
+    font-weight:800;
+    text-align:center;
+  }
+  .clock button:active {
+    transform:translateY(1px);
+    filter:brightness(1.18);
+  }
+  .clock button:disabled {
+    border-color:#29547f;
+    color:#83a5c9;
+    background:linear-gradient(180deg,#17365f,#092044);
+    box-shadow:none;
+  }
+  .clock #new-game,
+  .clock #time-toggle {
+    background:linear-gradient(180deg,#1b8ce6,#0b4d9c);
+    border-color:#8fd4ff;
+  }
+  .clock #next-day,
+  .clock #next-week,
+  .clock #next-month {
+    color:#06120d;
+    background:linear-gradient(180deg,#26e6a5,#05b878);
+    border-color:#8af7cf;
+  }
+}
+
+@media(max-width:360px){
+  .clock {
+    grid-template-columns:1fr;
+  }
+}
 #launch-modal .launch-copy { height:auto; min-height:0; }
 #launch-modal .founder-setup,#launch-modal .launch-advisor,#launch-modal .cloud-panel { flex:0 0 auto; align-self:stretch; }
 #launch-modal .founder-setup .portrait-grid,#launch-modal .founder-setup .logo-grid { overflow:visible!important; padding:0!important; scrollbar-width:none; }
