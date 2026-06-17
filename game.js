@@ -388,6 +388,8 @@ function ensureStateDefaults() {
   if (!Number.isFinite(state.bankDebt)) state.bankDebt=0;
   if (!Number.isFinite(state.bankRate)) state.bankRate=.085;
   if (!Number.isFinite(state.lastBankInterest)) state.lastBankInterest=0;
+  if (!Number.isFinite(state.lastBusinessProfit)) state.lastBusinessProfit=0;
+  if (!Number.isFinite(state.lastFounderPayout)) state.lastFounderPayout=0;
   if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
   ensureMissionDefaults();
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
@@ -440,8 +442,9 @@ function advanceDay(renderAfter=true) {
   accrueBankInterest();
   updateEconomy();
   updateTakeoverMarket();
-  runFacilities();
   runPlayerCompany(companies[0]);
+  runFacilities();
+  distributeFounderPayout();
   updateMissionProgress();
   companies.forEach(c => {
     c.previous=c.price;
@@ -1283,6 +1286,25 @@ function payDividends() {
   if (net!==0) state.news.unshift({day:state.day,text:`Quarterly dividends changed your cash balance by ${money.format(net)}.`,impact:0,ticker:"ACCOUNT"});
 }
 
+function distributeFounderPayout() {
+  const company=companies[0], profit=Math.max(0,company.dailyOperatingProfit||0);
+  state.lastBusinessProfit=(company.dailyOperatingProfit||0)*1000000;
+  state.lastFounderPayout=0;
+  if (profit<=0 || company.companyCash<=3) return;
+  const founderOwnership=clamp((company.founderShares||0)/(company.totalShares||1000000),0,1);
+  const payoutRate=.18;
+  const payout=Math.min(profit*1000000*payoutRate*founderOwnership,(company.companyCash-3)*1000000);
+  if (payout<=0) return;
+  state.cash+=payout;
+  company.companyCash-=payout/1000000;
+  state.lastFounderPayout=payout;
+  addLedger("Founder operating payout",payout);
+  if (state.day%5===0) {
+    state.news.unshift({day:state.day,text:`Nova paid ${money.format(payout)} from operating profits to the founder account.`,impact:.01,ticker:"ACCOUNT"});
+    state.news=state.news.slice(0,6);
+  }
+}
+
 function runPlayerCompany(company) {
   if (company.pendingDecisions) {
     const pending=company.pendingDecisions;
@@ -1774,6 +1796,10 @@ function renderDashboard(worth,investments) {
   renderPlayerBrand();
   hero.textContent=money.format(worth); hero.dataset.value=worth;
   document.querySelector("#hero-cash-available").textContent=money.format(state.cash);
+  document.querySelector("#hero-company-cash").textContent=`$${companies[0].companyCash.toFixed(2)}m`;
+  const payoutEl=document.querySelector("#hero-founder-payout");
+  payoutEl.textContent=money.format(state.lastFounderPayout||0);
+  payoutEl.className=(state.lastFounderPayout||0)>0?"up":"";
   const heroBank=document.querySelector("#hero-bank-debt");
   heroBank.textContent=money.format(state.bankDebt||0);
   heroBank.className=state.bankDebt?"down":"";
@@ -1843,6 +1869,7 @@ function renderMissionDashboard() {
   document.querySelector("#mission-objectives").innerHTML=missionObjectives(mission).map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
   document.querySelector("#mission-report").innerHTML=[
     ["Cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0],
+    ["Payout",money.format(state.lastFounderPayout||0),(state.lastFounderPayout||0)>0],
     ["Revenue",`$${c.dailyRevenue.toFixed(2)}m`,c.dailyRevenue>0],
     ["Profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
     ["Inventory",c.inventory.toLocaleString(),c.inventory<9000],
