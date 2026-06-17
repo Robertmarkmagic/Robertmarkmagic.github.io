@@ -53,7 +53,7 @@ function createAiFunds() {
 
 const state = {
   day:1, cash:100000, startWorth:100000, selected:0, side:"buy", orderType:"market",
-  mode:"open",
+  mode:"guided",
   holdings:{}, averageCost:{}, news:[], openOrders:[], ledger:[],
   economy:{interestRate:.04,inflation:.025,confidence:100,growth:.022,fuelIndex:100,regime:"Steady expansion"},
   difficulty:"normal", gameOver:false, takeoverNotice:"No active takeover campaign", selectedProduct:0,
@@ -67,6 +67,7 @@ const state = {
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
+const SAVE_PROFILE_KEY="market-foundry-save-profile-v1";
 const MODE_KEY="market-foundry-mode";
 const TRADING_DAYS_PER_YEAR=240;
 const CAMPAIGN_YEARS=10;
@@ -79,7 +80,7 @@ let supabaseClient = null;
 let currentUser = null;
 let audioContext = null;
 let audioEnabled = false;
-const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null };
+const runtime = { lastFrame:0, fps:60, frames:0, fpsTime:0, touchStart:null, lastAutoSave:0 };
 const guideState = { productClass:"food", product:"bread" };
 const facilityBlueprints = {
   factory:{name:"Factory",cost:12,capacity:140,role:"Produces finished goods"},
@@ -345,7 +346,7 @@ function nextTutorialStep() {
 }
 
 function ensureStateDefaults() {
-  if (!state.mode || state.mode==="guided" || state.mode==="expert") state.mode="open";
+  if (!state.mode || state.mode==="open") state.mode="guided";
   if (!state.player) state.player={name:"Founder",companyName:"Nova Devices",avatar:"founder-a",logo:"logo-a"};
   if (!Array.isArray(state.facilities)) state.facilities=[];
   if (!state.selectedFacilityId && state.facilities[0]) state.selectedFacilityId=state.facilities[0].id;
@@ -358,7 +359,7 @@ function ensureStateDefaults() {
 function openLaunchModal() {
   document.querySelector("#launch-modal").classList.remove("hidden");
   document.querySelector("#launch-load").disabled=!localStorage.getItem(SAVE_KEY);
-  updateCloudStatus();
+  updateLocalSaveStatus();
 }
 
 const marketLinks = {
@@ -431,6 +432,7 @@ function advanceDay(renderAfter=true) {
   checkProgression();
   state.equityHistory.push(accountEquity());
   state.equityHistory=state.equityHistory.slice(-60);
+  autoSaveLocal("advance-day");
   if (renderAfter) render();
   return !state.gameOver;
 }
@@ -698,7 +700,33 @@ function endGame(title,body,won) {
 }
 
 function makeSavePayload() {
-  return {version:5,companies,state,orderId,savedAt:new Date().toISOString()};
+  const now=new Date().toISOString();
+  return {
+    version:5,
+    companies,
+    state,
+    orderId,
+    savedAt:now,
+    gameState:{companies,state,orderId},
+    currentMode:state.mode,
+    currentMission:state.missions?.selected || "save-nova",
+    completedMissions:[...(state.missions?.completed || [])],
+    unlockedScreens:progressionMilestones.map(milestone=>milestone.id),
+    companyStats:{
+      companyName:state.player?.companyName || companies[0].name,
+      cash:companies[0].companyCash,
+      marketShare:companies[0].marketShare,
+      customerSatisfaction:companies[0].customerSatisfaction,
+      brandScore:companies[0].brandScore,
+      dailyProfit:companies[0].dailyOperatingProfit
+    },
+    playerDecisions:{
+      selectedProduct:state.selectedProduct,
+      products:companies[0].products.map(product=>({name:product.name,price:product.price,production:product.production,marketing:product.marketing,quality:product.quality,active:product.active})),
+      facilities:state.facilities
+    },
+    reports:companies.map(company=>({ticker:company.ticker,reports:company.reports || []}))
+  };
 }
 
 function applySavePayload(payload, label="Saved game loaded.") {
@@ -723,6 +751,7 @@ function saveGame() {
     localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
     localStorage.setItem(MODE_KEY,state.mode);
     addLedger("Game saved",0);
+    updateLocalSaveStatus();
     render();
     message(`Game saved locally at ${new Date(payload.savedAt).toLocaleTimeString()}.`,true);
     document.querySelector("#status-headline").textContent="Game saved locally in this browser.";
@@ -734,6 +763,85 @@ function saveGame() {
     document.querySelector("#status-headline").textContent=text;
     playCue("error");
     return false;
+  }
+}
+
+function autoSaveLocal(reason="auto") {
+  try {
+    const payload=makeSavePayload();
+    localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+    localStorage.setItem(MODE_KEY,state.mode);
+    updateLocalSaveStatus();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveProfilePayload(email, companyName) {
+  const now=new Date().toISOString();
+  const existing=JSON.parse(localStorage.getItem(SAVE_PROFILE_KEY) || "null");
+  const payload=makeSavePayload();
+  // TODO: Send this exact save profile structure to Supabase/Firebase/backend
+  // when online saves are implemented. For now it is stored only in localStorage.
+  return {
+    email:email.toLowerCase(),
+    companyName,
+    gameState:payload.gameState,
+    currentMode:payload.currentMode,
+    completedMissions:payload.completedMissions,
+    unlockedScreens:payload.unlockedScreens,
+    createdAt:existing?.createdAt || now,
+    lastSavedAt:now
+  };
+}
+
+function openSaveProfile() {
+  const modal=document.querySelector("#save-profile-modal");
+  const profile=JSON.parse(localStorage.getItem(SAVE_PROFILE_KEY) || "null");
+  document.querySelector("#profile-email").value=profile?.email || "";
+  document.querySelector("#profile-company").value=state.player?.companyName || companies[0].name || profile?.companyName || "";
+  document.querySelector("#profile-status").textContent="Your game is saved locally in this browser.";
+  modal.classList.remove("hidden");
+}
+
+function closeSaveProfile() {
+  document.querySelector("#save-profile-modal").classList.add("hidden");
+}
+
+function saveProfileLocally() {
+  const email=document.querySelector("#profile-email").value.trim();
+  const companyName=(document.querySelector("#profile-company").value.trim() || state.player?.companyName || companies[0].name || "Nova Devices");
+  if (!email || !email.includes("@")) {
+    document.querySelector("#profile-status").textContent="Enter an email to create a save profile.";
+    document.querySelector("#profile-status").className="down";
+    return;
+  }
+  if (state.player) state.player.companyName=companyName;
+  companies[0].name=companyName;
+  const profile=saveProfilePayload(email,companyName);
+  localStorage.setItem(SAVE_PROFILE_KEY,JSON.stringify(profile));
+  localStorage.setItem(SAVE_KEY,JSON.stringify(makeSavePayload()));
+  document.querySelector("#profile-status").textContent="Saved locally. Online save is coming soon. You can continue playing without saving online.";
+  document.querySelector("#profile-status").className="up";
+  document.querySelector("#status-headline").textContent="Your game is saved locally in this browser.";
+  updateLocalSaveStatus();
+  playCue("order");
+}
+
+function updateLocalSaveStatus() {
+  const status=document.querySelector("#local-save-status");
+  if (!status) return;
+  const raw=localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    status.textContent="Local auto-save is ready in this browser.";
+    return;
+  }
+  try {
+    const payload=JSON.parse(raw);
+    status.textContent=`Continue Local Game is available. Last local save: ${new Date(payload.savedAt).toLocaleString()}.`;
+  } catch {
+    status.textContent="A local save exists, but it could not be read.";
   }
 }
 
@@ -766,26 +874,14 @@ function updateCloudStatus(text, good=null) {
   let next=text;
   if (!next) {
     if (!window.supabase) next="Cloud library could not load. Local saves still work.";
-    else if (!config.url || !config.anonKey) next="Setup required: add your Supabase URL and anon key to enable email signup.";
+    else if (!config.url || !config.anonKey) next="Online save is coming soon. Your game is currently saved in this browser.";
     else if (currentUser) next=`Signed in as ${currentUser.email}. Cloud saves are ready.`;
-    else next="Cloud is configured. Sign in or create an account.";
+    else next="Online save is coming soon. Your game is currently saved in this browser.";
   }
   status.textContent=next;
   status.className=good===null ? "" : good ? "up" : "down";
-  const configured=cloudConfigured();
-  document.querySelector("#auth-sign-up").disabled=false;
-  document.querySelector("#auth-sign-in").disabled=false;
-  document.querySelector("#auth-resend").disabled=false;
-  document.querySelector("#auth-reset").disabled=false;
-  document.querySelector("#auth-sign-out").disabled=!currentUser;
-  document.querySelector("#cloud-save").disabled=!configured || !currentUser;
-  document.querySelector("#cloud-load").disabled=!configured || !currentUser;
-  if (!configured) {
-    document.querySelector("#auth-sign-up").title="Add Supabase URL and anon key in supabase-config.js first.";
-    document.querySelector("#auth-sign-in").title="Add Supabase URL and anon key in supabase-config.js first.";
-    document.querySelector("#auth-resend").title="Add Supabase URL and anon key in supabase-config.js first.";
-    document.querySelector("#auth-reset").title="Add Supabase URL and anon key in supabase-config.js first.";
-  }
+  document.querySelector("#cloud-save").disabled=false;
+  document.querySelector("#cloud-load").disabled=false;
 }
 
 function explainCloudSetup() {
@@ -810,9 +906,8 @@ function initCloud() {
 
 function authFields() {
   return {
-    email:document.querySelector("#auth-email").value.trim(),
-    password:document.querySelector("#auth-password").value,
-    mailingList:document.querySelector("#auth-mailing-list")?.checked ?? true
+    email:document.querySelector("#profile-email")?.value.trim() || "",
+    password:""
   };
 }
 
@@ -821,26 +916,17 @@ function authRedirectUrl() {
 }
 
 async function addEmailSubscriber(email, source="signup") {
-  if (!supabaseClient || !email) return null;
-  const {error}=await supabaseClient.from("email_subscribers").upsert({
-    email:email.toLowerCase(),
-    user_id:currentUser?.id || null,
-    source,
-    subscribed:true,
-    updated_at:new Date().toISOString()
-  },{onConflict:"email"});
-  return error;
+  return null;
 }
 
 async function signUp() {
   if (!supabaseClient) return explainCloudSetup();
-  const {email,password,mailingList}=authFields();
+  const {email,password}=authFields();
   if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.",false);
   const redirectTo=authRedirectUrl();
-  if (mailingList) await addEmailSubscriber(email,"signup-form");
   const {error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
   if (error) return updateCloudStatus(error.message,false);
-  updateCloudStatus("Check your email. If this account already exists, use Sign in, Resend email, or Reset password.",true);
+  updateCloudStatus("Check your email for save-game access.",true);
 }
 
 async function resendConfirmation() {
@@ -869,7 +955,6 @@ async function signIn() {
   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
   if (error) return updateCloudStatus(error.message,false);
   currentUser=data.user;
-  if (document.querySelector("#auth-mailing-list")?.checked) await addEmailSubscriber(email,"sign-in-form");
   updateCloudStatus();
 }
 
@@ -880,53 +965,24 @@ async function signOut() {
 }
 
 async function cloudSaveGame() {
-  if (!cloudReady()) {
-    const text="Sign in before using cloud saves. Local Save still works.";
-    updateCloudStatus(text,false);
-    message(text,false);
-    document.querySelector("#status-headline").textContent=text;
-    return;
-  }
-  const payload=makeSavePayload();
-  const {error}=await supabaseClient.from("saved_games").upsert({
-    user_id:currentUser.id,
-    slot:"main",
-    payload,
-    updated_at:new Date().toISOString()
-  },{onConflict:"user_id,slot"});
-  if (error) {
-    updateCloudStatus(error.message,false);
-    message(error.message,false);
-    document.querySelector("#status-headline").textContent=`Cloud save failed: ${error.message}`;
-    playCue("error");
-    return;
-  }
-  localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
-  addLedger("Cloud save complete",0);
-  updateCloudStatus("Cloud save complete.",true);
-  render();
-  message(`Cloud save complete at ${new Date(payload.savedAt).toLocaleTimeString()}.`,true);
-  document.querySelector("#status-headline").textContent="Cloud save complete.";
-  playCue("order");
+  openSaveProfile();
+  message("Email is only used to save your game. You can continue playing without saving online.",true);
+  // TODO: When backend save is ready, submit saveProfilePayload() to Supabase/Firebase here.
 }
 
 async function cloudLoadGame() {
-  if (!cloudReady()) return updateCloudStatus("Sign in before using cloud saves.");
-  const {data,error}=await supabaseClient.from("saved_games").select("payload,updated_at").eq("user_id",currentUser.id).eq("slot","main").maybeSingle();
-  if (error) return updateCloudStatus(error.message);
-  if (!data) return updateCloudStatus("No cloud save found for this account.");
-  try {
-    localStorage.setItem(SAVE_KEY,JSON.stringify(data.payload));
-    applySavePayload(data.payload,"Cloud save loaded.");
-    updateCloudStatus(`Cloud save loaded from ${new Date(data.updated_at).toLocaleString()}.`);
-  } catch {
-    updateCloudStatus("The cloud save could not be loaded.");
-  }
+  openSaveProfile();
+  const text="Online save is coming soon. Your game is currently saved in this browser.";
+  document.querySelector("#profile-status").textContent=text;
+  document.querySelector("#profile-status").className="";
+  message(text,true);
+  document.querySelector("#status-headline").textContent=text;
+  // TODO: When backend save is ready, recover a save profile by email here.
 }
 
-function newGame(startTutorial=false, mode="open") {
+function newGame(startTutorial=false, mode="guided") {
   restoreArray(companies,initialCompanies); restoreObject(state,initialState); orderId=0;
-  state.mode="open";
+  state.mode=mode==="expert"?"expert":"guided";
   localStorage.setItem(MODE_KEY,state.mode);
   ensureMissionDefaults();
   state.player={
@@ -939,9 +995,9 @@ function newGame(startTutorial=false, mode="open") {
   companies[0].founderShares=750000;
   state.difficulty=document.querySelector("#difficulty").value;
   const settings=difficultySettings(); companies[0].unitCost*=settings.costMultiplier; companies[0].products.forEach(p=>p.unitCost*=settings.costMultiplier); companies.forEach(c=>c.volatility*=settings.volatility);
-  companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); render(); message("New open game started. All systems are unlocked; use the task dropdown when you want a challenge.",true);
+  companies.forEach(seedBook); document.querySelector("#game-modal").classList.add("hidden"); document.querySelector("#launch-modal").classList.add("hidden"); autoSaveLocal("new-game"); render(); message(`${state.mode==="expert"?"Expert Mode":"Guided Mode"} started. No email required to play. Your game is saved locally in this browser.`,true);
   playCue("win");
-  if (startTutorial) beginTutorial();
+  if (startTutorial && state.mode==="guided") beginTutorial();
 }
 
 function restoreArray(target,source) { target.splice(0,target.length,...JSON.parse(JSON.stringify(source))); }
@@ -1270,7 +1326,7 @@ function pct(value){ return `${value>=0?"+":""}${(value*100).toFixed(2)}%`; }
 function message(text,good){ const el=document.querySelector("#trade-message"); el.textContent=text; el.className=good?"up":"down"; }
 
 function ensureMissionDefaults() {
-  if (!state.mode || state.mode==="guided" || state.mode==="expert") state.mode="open";
+  if (!state.mode || state.mode==="open") state.mode="guided";
   if (!state.missions) state.missions={};
   if (!state.missions.selected) state.missions.selected="save-nova";
   if (!Array.isArray(state.missions.completed)) state.missions.completed=[];
@@ -1381,8 +1437,8 @@ function markMissionInput(id) {
 }
 
 function startExpertMode(startTutorial=false) {
-  newGame(false,"open");
-  message("Open game started without the startup guide. All systems are available.",true);
+  newGame(false,"expert");
+  message("Expert Mode started. No email required to play. Your game is saved locally in this browser.",true);
 }
 
 function selectCompany(index) {
@@ -1444,6 +1500,10 @@ function gameLoop(timestamp) {
       state.autoTime.accumulator=0;
       advanceDay(true);
     }
+  }
+  if (timestamp-runtime.lastAutoSave>5000 && !state.gameOver) {
+    runtime.lastAutoSave=timestamp;
+    autoSaveLocal("timer");
   }
   renderFrame();
   requestAnimationFrame(gameLoop);
@@ -1510,7 +1570,7 @@ function renderMissionDashboard() {
     ["Demand",`${Math.round(signals.demand*100)}%`,signals.demand>=.6],
     ["Satisfaction",`${signals.satisfaction}/100`,signals.satisfaction>=60],
     ["Brand",`${signals.brand}/100`,signals.brand>=50],
-    ["Mode","Open play",true]
+    ["Mode",state.mode==="expert"?"Expert Mode":"Guided Mode",true]
   ].map(item=>`<div><span>${item[0]}</span><strong class="${item[2]?"up":"down"}">${item[1]}</strong></div>`).join("");
 }
 
@@ -2080,9 +2140,10 @@ function updateEstimate(){
 }
 
 function bootstrapSavedMode() {
-  if (localStorage.getItem(MODE_KEY)==="expert" || localStorage.getItem(MODE_KEY)==="guided") localStorage.setItem(MODE_KEY,"open");
-  state.mode="open";
+  const savedMode=localStorage.getItem(MODE_KEY);
+  state.mode=savedMode==="expert"?"expert":"guided";
   ensureMissionDefaults();
+  updateLocalSaveStatus();
 }
 
 companies.forEach(seedBook);
@@ -2094,12 +2155,13 @@ document.querySelector("#show-advisor").onclick=()=>{state.advisorHidden=false;r
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
 document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
 document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});
-document.querySelector("#save-game").onclick=saveGame; document.querySelector("#load-game").onclick=loadGame; document.querySelector("#new-game").onclick=openLaunchModal; document.querySelector("#modal-button").onclick=()=>newGame(true);
+document.querySelector("#save-game").onclick=saveGame; document.querySelector("#load-game").onclick=loadGame; document.querySelector("#new-game").onclick=openLaunchModal; document.querySelector("#modal-button").onclick=()=>newGame(true,"guided");
 document.querySelector("#cloud-save").onclick=cloudSaveGame; document.querySelector("#cloud-load").onclick=cloudLoadGame;
-document.querySelector("#auth-sign-up").onclick=signUp; document.querySelector("#auth-sign-in").onclick=signIn; document.querySelector("#auth-resend").onclick=resendConfirmation; document.querySelector("#auth-reset").onclick=resetPassword; document.querySelector("#auth-sign-out").onclick=signOut;
-document.querySelector("#launch-start").onclick=()=>newGame(true);
+document.querySelector("#profile-save").onclick=saveProfileLocally; document.querySelector("#profile-close").onclick=closeSaveProfile;
+document.querySelector("#launch-start").onclick=()=>newGame(true,"guided");
 document.querySelector("#launch-expert").onclick=()=>startExpertMode(false);
 document.querySelector("#launch-load").onclick=()=>loadGame();
+document.querySelector("#launch-email-load").onclick=cloudLoadGame;
 document.querySelector("#launch-explore").onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
 document.querySelector("#tutorial-next").onclick=nextTutorialStep;
 document.querySelector("#tutorial-skip").onclick=finishTutorial;

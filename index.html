@@ -15,7 +15,7 @@
       <p class="header-subtitle">Corporate command network</p>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save</button><button id="load-game">Load</button><button id="cloud-save">Cloud save</button><button id="cloud-load">Cloud load</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -279,7 +279,8 @@
       <div class="launch-copy">
         <p class="eyebrow">WELCOME TO THE BOARDROOM</p>
         <h2>Build Your Market Empire</h2>
-        <p>Trade the market, run Nova Devices, read the economy, and grow from basic cash trader into a deal-making financier.</p>
+        <p>Start playing instantly. No email required.</p>
+        <p class="save-copy-small">Email is only needed if you want to save your game and continue later. Your game is saved locally in this browser.</p>
         <div class="founder-setup">
           <strong>Founder setup</strong>
           <label>Your name<input id="founder-name" maxlength="24" value="Founder"></label>
@@ -287,16 +288,26 @@
           <div><span>Choose face</span><div class="choice-row portrait-grid" id="avatar-choices"><button data-avatar="founder-a" class="active"><i class="avatar-chip founder-a"></i></button><button data-avatar="founder-b"><i class="avatar-chip founder-b"></i></button><button data-avatar="founder-c"><i class="avatar-chip founder-c"></i></button><button data-avatar="founder-d"><i class="avatar-chip founder-d"></i></button><button data-avatar="founder-e"><i class="avatar-chip founder-e"></i></button><button data-avatar="founder-f"><i class="avatar-chip founder-f"></i></button><button data-avatar="founder-g"><i class="avatar-chip founder-g"></i></button><button data-avatar="founder-h"><i class="avatar-chip founder-h"></i></button><button data-avatar="founder-i"><i class="avatar-chip founder-i"></i></button><button data-avatar="founder-j"><i class="avatar-chip founder-j"></i></button></div></div>
           <div><span>Choose logo</span><div class="choice-row logo-grid" id="logo-choices"><button data-logo="logo-a" class="active"><i class="logo-chip logo-a"></i></button><button data-logo="logo-b"><i class="logo-chip logo-b"></i></button><button data-logo="logo-c"><i class="logo-chip logo-c"></i></button><button data-logo="logo-d"><i class="logo-chip logo-d"></i></button><button data-logo="logo-e"><i class="logo-chip logo-e"></i></button><button data-logo="logo-f"><i class="logo-chip logo-f"></i></button><button data-logo="logo-g"><i class="logo-chip logo-g"></i></button><button data-logo="logo-h"><i class="logo-chip logo-h"></i></button><button data-logo="logo-i"><i class="logo-chip logo-i"></i></button><button data-logo="logo-j"><i class="logo-chip logo-j"></i></button></div></div>
         </div>
-        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>Start with a full game guide, then play freely with all systems unlocked.</span></div></div>
-        <div class="cloud-panel" aria-label="Cloud account">
-          <div><strong>Cloud account</strong><span id="cloud-status">Setup required: add your Supabase URL and anon key to enable email signup.</span></div>
-          <label>Email<input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
-          <label>Password<input id="auth-password" type="password" autocomplete="current-password" placeholder="At least 6 characters"></label>
-          <label class="mailing-consent"><input id="auth-mailing-list" type="checkbox" checked> Add me to the Market Foundry email list</label>
-          <div class="cloud-actions"><button id="auth-sign-up">Sign up</button><button id="auth-sign-in">Sign in</button><button id="auth-resend">Resend email</button><button id="auth-reset">Reset password</button><button id="auth-sign-out">Sign out</button></div>
+        <div class="launch-advisor"><img src="assets/executive-advisor.png" alt="Executive advisor"><div><strong>Your advisor is ready.</strong><span>Choose a startup guide or jump straight into Expert Mode. You can continue playing without saving online.</span></div></div>
+        <div class="local-save-panel" aria-label="Local save status">
+          <strong>No email required to play.</strong>
+          <span id="local-save-status">Local auto-save is ready in this browser.</span>
         </div>
-        <div class="launch-actions"><button id="launch-start" class="primary">Start game with startup guide</button><button id="launch-expert">Start without guide</button><button id="launch-load">Load saved game</button><button id="launch-explore">Explore current board</button></div>
+        <div class="launch-actions"><button id="launch-start" class="primary">Start New Game</button><button id="launch-load">Continue Local Game</button><button id="launch-expert">Expert Mode</button><button id="launch-email-load">Load Saved Game</button></div>
       </div>
+    </div>
+  </div>
+
+  <div id="save-profile-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card save-profile-card">
+      <p class="eyebrow">SAVE PROFILE</p>
+      <h2>Save your game</h2>
+      <p>Enter your email to save your company and continue later.</p>
+      <p class="save-copy-small">Email is only used to save your game. Online save is coming soon. Your game is currently saved in this browser.</p>
+      <label>Email<input id="profile-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
+      <label>Company name<input id="profile-company" maxlength="32" placeholder="Nova Devices"></label>
+      <div class="save-profile-actions"><button id="profile-save" class="primary">Save my game</button><button id="profile-close">Continue playing without saving online</button></div>
+      <p id="profile-status" role="status"></p>
     </div>
   </div>
 
