@@ -240,7 +240,7 @@ label { color:var(--muted); } input { display:block; margin-top:6px; width:100%;
 .guide-art-paper { background:linear-gradient(135deg,#fef3c7,#f8fafc 50%,#1d4ed8); }
 .guide-art-luxury { background:radial-gradient(circle,#fef08a 0 18%,transparent 19%),linear-gradient(135deg,#312e81,#a16207); }
 .guide-art-general { background:linear-gradient(135deg,#0b4ea2,#041637); }
-.guide-flow { display:grid; grid-template-columns:1fr 28px 1fr 28px 1fr; gap:8px; align-items:center; margin:16px 0; }
+.guide-flow { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:8px; align-items:stretch; margin:16px 0; }
 .guide-flow div { min-height:118px; padding:10px; background:#0f57c8; border:2px ridge #55aaff; border-radius:10px; }
 .guide-flow .guide-product-art { width:58px; height:58px; margin-bottom:8px; border-width:2px; }
 .guide-flow .guide-product-art span { font-size:20px; }
@@ -249,7 +249,7 @@ label { color:var(--muted); } input { display:block; margin-top:6px; width:100%;
 .guide-flow .player-brand .avatar-chip,.guide-flow .player-brand .logo-chip { width:58px; height:58px; }
 .guide-flow strong,.guide-flow span { display:block; }
 .guide-flow span { color:#b9d8ff; font-size:12px; margin-top:4px; }
-.guide-flow i { height:6px; background:#b7d8ff; box-shadow:0 0 12px #7fc7ff; }
+.guide-flow i { display:none; }
 .guide-quality { background:#eef4c8; color:#17305f; border:3px ridge #55aaff; border-radius:10px; padding:12px; }
 .guide-quality h3 { color:#b39400; }
 .guide-quality p,.guide-stats span { display:flex; justify-content:space-between; gap:10px; margin:8px 0; }

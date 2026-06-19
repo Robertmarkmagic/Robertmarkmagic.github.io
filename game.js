@@ -75,6 +75,7 @@ const TRADING_DAYS_PER_YEAR=240;
 const CAMPAIGN_YEARS=10;
 const CAMPAIGN_DAYS=TRADING_DAYS_PER_YEAR*CAMPAIGN_YEARS;
 const PUBLIC_SITE_URL="https://robertmarkmagic.github.io/";
+const FACILITY_UNIT_SCALE=100;
 const initialCompanies=JSON.parse(JSON.stringify(companies));
 const initialState=JSON.parse(JSON.stringify(state));
 let orderId = 0;
@@ -112,8 +113,8 @@ const productLines = {
   softDrinks:{name:"Soft Drinks",raw:"syrup",input:"Drink syrup",output:"Soft drinks",unitCost:7,unitPrice:21,market:165},
   cosmetics:{name:"Cosmetics",raw:"chemicals",input:"Cosmetic compounds",output:"Cosmetics",unitCost:22,unitPrice:68,market:95},
   medicine:{name:"Medicine",raw:"pharma",input:"Pharma ingredients",output:"Medicine",unitCost:35,unitPrice:118,market:80},
-  computers:{name:"Computers",raw:"chips",input:"Microchips",output:"Computers",unitCost:210,unitPrice:520,market:45},
-  printers:{name:"Printers",raw:"components",input:"Components",output:"Printers",unitCost:86,unitPrice:230,market:58},
+  computers:{name:"Computers",raw:"chips",input:"Microchips",output:"Computers",unitCost:210,unitPrice:520,market:45,recipe:[{raw:"chips",name:"CPU",qty:1},{raw:"components",name:"Electronic components",qty:3},{raw:"steel",name:"Steel casing",qty:2}]},
+  printers:{name:"Printers",raw:"components",input:"Components",output:"Printers",unitCost:86,unitPrice:230,market:58,recipe:[{raw:"components",name:"Electronic components",qty:2},{raw:"steel",name:"Frame",qty:1}]},
   appliances:{name:"Appliances",raw:"steel",input:"Steel",output:"Appliances",unitCost:130,unitPrice:340,market:52},
   luxuryCars:{name:"Luxury Cars",raw:"autoParts",input:"Auto parts",output:"Luxury cars",unitCost:1800,unitPrice:4200,market:14},
   motorcycles:{name:"Motorcycles",raw:"autoParts",input:"Auto parts",output:"Motorcycles",unitCost:620,unitPrice:1450,market:22},
@@ -655,12 +656,12 @@ function facilityMarketMetrics(facility) {
   const grossMargin=(revenuePrice-unitCost)/Math.max(1,revenuePrice);
   const stock=role==="industry"?facility.rawInventory:facility.finishedInventory;
   const marketingCost=facility.marketing*1000;
-  const contribution=Math.max(1,revenuePrice-unitCost);
+  const contribution=Math.max(1,(revenuePrice-unitCost)*FACILITY_UNIT_SCALE);
   const breakEvenUnits=Math.ceil(marketingCost/contribution);
   const possibleUnits=role==="store"?Math.min(stock,capacity,demand):Math.min(capacity,demand);
-  const estimatedProfit=(possibleUnits*revenuePrice-possibleUnits*unitCost-marketingCost)/1000000;
+  const estimatedProfit=(possibleUnits*revenuePrice*FACILITY_UNIT_SCALE-possibleUnits*unitCost*FACILITY_UNIT_SCALE-marketingCost)/1000000;
   const capacityUse=capacity?clamp((facility.lastUnits||0)/capacity,0,1):0;
-  return {line,role,capacity,maxCapacity,price,revenuePrice,competitorPrice,demand,unitCost,grossMargin,stock,breakEvenUnits,estimatedProfit,capacityUse,possibleUnits};
+  return {line,role,capacity,maxCapacity,price,revenuePrice,competitorPrice,demand,unitCost,grossMargin,stock,breakEvenUnits,estimatedProfit,capacityUse,possibleUnits,marketingCost};
 }
 
 function facilityAdvice(metrics) {
@@ -742,7 +743,7 @@ function buildFacility() {
   if (!hasControl()) return empireMessage("You need board control to build facilities.",false);
   if (company.companyCash<cost) return empireMessage(`Nova needs $${cost}m cash to build this ${blueprint.name}.`,false);
   const role=facilityRole(type);
-  const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:role==="industry"?0:60,finishedInventory:role==="store"?40:0,marketing:35,price:productLines[line].unitPrice,productionTarget:facilityBlueprints[type].capacity,profit:0,lastUnits:0};
+  const facility={id:Date.now()+Math.floor(Math.random()*1000),type,line,level:1,rawInventory:role==="industry"?0:60,finishedInventory:role==="store"?40:0,marketing:18,price:productLines[line].unitPrice,productionTarget:facilityBlueprints[type].capacity,profit:0,lastUnits:0};
   state.facilities.push(facility);
   state.selectedFacilityId=facility.id;
   company.companyCash-=cost;
@@ -778,10 +779,11 @@ function upgradeFacility(id) {
 function marketFacility(id) {
   const facility=state.facilities.find(item=>item.id===id), company=companies[0];
   if (!facility) return;
-  if (company.companyCash<1) return empireMessage("Need $1m company cash for a marketing push.",false);
-  company.companyCash-=1; facility.marketing+=20;
-  addLedger(`Marketing push: ${facilityLabel(facility)}`,-1000000);
-  empireMessage(`${facilityLabel(facility)} marketing increased.`,true);
+  const cost=.25;
+  if (company.companyCash<cost) return empireMessage("Need $0.25m company cash for a marketing push.",false);
+  company.companyCash-=cost; facility.marketing+=8;
+  addLedger(`Marketing push: ${facilityLabel(facility)}`,-cost*1000000);
+  empireMessage(`${facilityLabel(facility)} marketing increased. The campaign cost $0.25m and raises daily demand spending.`,true);
   render();
 }
 
@@ -826,10 +828,10 @@ function runFacilities() {
       const made=Math.round(capacity*(.85+Math.random()*.3));
       rawPool[line.raw]=(rawPool[line.raw]||0)+made;
       facility.rawInventory+=made; facility.lastUnits=made;
-      const cost=made*line.unitCost*.35*settings.costPressure/1000000;
+      const cost=made*line.unitCost*.35*settings.costPressure*FACILITY_UNIT_SCALE/1000000;
       const metrics=facilityMarketMetrics(facility);
       const sold=Math.min(facility.rawInventory,Math.round(metrics.demand*.45),capacity);
-      const sales=sold*metrics.revenuePrice/1000000, marketing=facility.marketing/1000;
+      const sales=sold*metrics.revenuePrice*FACILITY_UNIT_SCALE/1000000, marketing=facility.marketing/1000;
       facility.rawInventory=Math.max(0,facility.rawInventory-sold);
       company.companyCash+=sales-cost-marketing; facility.profit=sales-cost-marketing; profit+=facility.profit; revenue+=sales; units+=sold;
     }
@@ -837,18 +839,22 @@ function runFacilities() {
   state.facilities.forEach(facility=>{
     const line=productLines[facility.line], maxCapacity=facilityBlueprints[facility.type].capacity*facility.level, capacity=Math.min(maxCapacity,facility.productionTarget||maxCapacity);
     if (facilityRole(facility.type)==="factory") {
-      const availableRaw=(rawPool[line.raw]||0)+facility.rawInventory;
-      const rawUsed=Math.min(capacity,availableRaw);
-      const external=Math.max(0,capacity-rawUsed);
-      rawPool[line.raw]=Math.max(0,(rawPool[line.raw]||0)-rawUsed);
-      facility.rawInventory=Math.max(0,facility.rawInventory-Math.max(0,rawUsed-(rawPool[line.raw]||0)));
-      const made=Math.round((rawUsed+external)*(.82+Math.random()*.12));
+      const recipe=line.recipe || [{raw:line.raw,name:line.input,qty:1}];
+      const availableFor=part=>(rawPool[part.raw]||0)+(part.raw===line.raw?facility.rawInventory:0);
+      const inHouseCapacity=Math.min(capacity,...recipe.map(part=>Math.floor(availableFor(part)/part.qty)));
+      const external=Math.max(0,capacity-inHouseCapacity);
+      recipe.forEach(part=>{
+        const needed=inHouseCapacity*part.qty, pooled=Math.min(rawPool[part.raw]||0,needed);
+        rawPool[part.raw]=Math.max(0,(rawPool[part.raw]||0)-pooled);
+        if (part.raw===line.raw) facility.rawInventory=Math.max(0,facility.rawInventory-(needed-pooled));
+      });
+      const made=Math.round((inHouseCapacity+external)*(.82+Math.random()*.12));
       finishedPool[facility.line]=(finishedPool[facility.line]||0)+made;
       facility.finishedInventory+=made; facility.lastUnits=made;
-      const cost=(made*line.unitCost+external*line.unitCost*.8)*settings.costPressure/1000000;
+      const cost=(made*line.unitCost+external*line.unitCost*.8)*settings.costPressure*FACILITY_UNIT_SCALE/1000000;
       const metrics=facilityMarketMetrics(facility);
       const sold=Math.min(facility.finishedInventory,Math.round(metrics.demand*.55),capacity);
-      const sales=sold*metrics.revenuePrice/1000000, marketing=facility.marketing/1000;
+      const sales=sold*metrics.revenuePrice*FACILITY_UNIT_SCALE/1000000, marketing=facility.marketing/1000;
       facility.finishedInventory=Math.max(0,facility.finishedInventory-sold);
       company.companyCash+=sales-cost-marketing; facility.profit=sales-cost-marketing; profit+=facility.profit; revenue+=sales; units+=sold;
     }
@@ -864,7 +870,7 @@ function runFacilities() {
       const sold=Math.min(supply,capacity,demand);
       facility.finishedInventory=Math.max(0,supply-sold);
       finishedPool[facility.line]=0;
-      const sales=sold*price/1000000, marketing=facility.marketing/1000;
+      const sales=sold*price*FACILITY_UNIT_SCALE/1000000, marketing=facility.marketing/1000;
       company.companyCash+=sales-marketing; profit+=sales-marketing; revenue+=sales; units+=sold;
       facility.profit=sales-marketing; facility.lastUnits=sold;
     }
@@ -2388,6 +2394,19 @@ function nextAdvisorTip() {
   return;
 }
 
+function showAdvisorPanel() {
+  state.advisorHidden=false;
+  render();
+  const panel=document.querySelector("#advisor");
+  if (panel) {
+    panel.classList.add("attention-pulse");
+    panel.scrollIntoView({behavior:"smooth",block:"center"});
+    setTimeout(()=>panel.classList.remove("attention-pulse"),900);
+  }
+  message("Advisor opened.",true);
+  playCue("click");
+}
+
 function renderCampaign() {
   const c=companies[0], s=difficultySettings(), daysLeft=Math.max(0,CAMPAIGN_DAYS-state.day), yearsLeft=Math.floor(daysLeft/TRADING_DAYS_PER_YEAR), remainder=daysLeft%TRADING_DAYS_PER_YEAR;
   document.querySelector("#campaign-status").textContent=state.gameOver?"Campaign ended":`${yearsLeft}y ${remainder}d remaining`;
@@ -2638,6 +2657,10 @@ function guideArt(key,label) {
   return `<div class="guide-product-art guide-art-${art[1]}"><span>${art[0]}</span></div>`;
 }
 
+function recipeParts(line) {
+  return line.recipe || [{raw:line.raw,name:line.input,qty:1}];
+}
+
 function guideBuildFacility(type,lineKey) {
   const typeSelect=document.querySelector("#facility-type"), lineSelect=document.querySelector("#facility-line");
   if (typeSelect) typeSelect.value=type;
@@ -2655,6 +2678,7 @@ function renderManufacturerGuide() {
   const techHeavy=["computers","phones","medicine","printers","appliances"].includes(guideState.product);
   const productionQuality=techHeavy?.35:.2;
   const rawQuality=1-productionQuality;
+  const parts=recipeParts(line);
   classList.innerHTML=productClasses.map(item=>`<button class="${item.id===group.id?"active":""}" data-guide-class="${item.id}"><span>${item.name}</span><strong>${item.items.length}</strong></button>`).join("");
   productList.innerHTML=group.items.map(key=>`<button class="${key===guideState.product?"active":""}" data-guide-product="${key}"><span>${productLines[key].name}</span><small>${productLines[key].input} -> ${productLines[key].output}</small></button>`).join("");
   detail.innerHTML=`<div class="guide-recipe-card">
@@ -2663,7 +2687,7 @@ function renderManufacturerGuide() {
       <div><p class="eyebrow">MANUFACTURER'S GUIDE</p><h3>${line.name}</h3><span>${group.name}</span></div>
     </div>
     <div class="guide-flow">
-      <div>${guideArt(line.raw,line.input)}<strong>${line.input}</strong><span>1 unit raw input</span></div>
+      ${parts.map(part=>`<div>${guideArt(part.raw,part.name)}<strong>${part.name}</strong><span>${part.qty} unit${part.qty===1?"":"s"} input</span></div>`).join("<i></i>")}
       <i></i>
       <div>${guideArt(guideState.product,line.output)}<strong>${line.output}</strong><span>Factory output</span></div>
       <i></i>
@@ -2683,7 +2707,7 @@ function renderManufacturerGuide() {
     </div>
     <div class="guide-build-path">
       <strong>Suggested build path</strong>
-      <p>1. Build Raw-material Industry for ${line.input}. 2. Build Factory for ${line.output}. 3. Build ${shop.name} to sell it.</p>
+      <p>1. Secure inputs: ${parts.map(part=>part.name).join(", ")}. 2. Build Factory for ${line.output}. 3. Build ${shop.name} to sell it.</p>
       <div class="guide-actions">
         <button data-guide-build="industry">Build raw industry</button>
         <button data-guide-build="factory">Build factory</button>
@@ -2756,7 +2780,7 @@ function renderFirmView() {
       <header><div><h3>Operate this firm</h3><p>These controls update the selected firm immediately.</p></div><button data-scroll-facility="${facility.id}">Open full card</button></header>
       <label>Price <strong>${money.format(metrics.price)}</strong><input data-firm-live-control="${facility.id}" data-field="price" type="range" min="${priceMin}" max="${priceMax}" step="1" value="${Math.round(metrics.price)}"></label>
       <label>Production target <strong>${metrics.capacity.toLocaleString()}/day</strong><input data-firm-live-control="${facility.id}" data-field="productionTarget" type="range" min="1" max="${capacityMax}" step="1" value="${Math.round(metrics.capacity)}"></label>
-      <label>Marketing <strong>$${facility.marketing}k/day</strong><input data-firm-live-control="${facility.id}" data-field="marketing" type="range" min="0" max="300" step="5" value="${facility.marketing}"></label>
+      <label>Marketing <strong>$${facility.marketing}k/day</strong><input data-firm-live-control="${facility.id}" data-field="marketing" type="range" min="0" max="120" step="2" value="${facility.marketing}"></label>
       <div class="firm-flow">
         <span>${line.input}<strong>${((state.commodityInventory[line.raw]||0)+facility.rawInventory).toLocaleString()}</strong></span>
         <i></i>
@@ -2780,6 +2804,7 @@ function renderFirmView() {
         <span>Unit cost<strong>${money.format(metrics.unitCost)}</strong></span>
         <span>Gross margin<strong class="${metrics.grossMargin>=.25?"up":"down"}">${pct(metrics.grossMargin)}</strong></span>
         <span>Demand forecast<strong>${metrics.demand.toLocaleString()}</strong></span>
+        <span>Marketing cost<strong>$${(metrics.marketingCost/1000).toFixed(0)}k/day</strong></span>
         <span>Break-even units<strong>${metrics.breakEvenUnits.toLocaleString()}</strong></span>
         <span>Possible sales<strong>${metrics.possibleUnits.toLocaleString()}</strong></span>
         <span>Profit forecast<strong class="${metrics.estimatedProfit>=0?"up":"down"}">${metrics.estimatedProfit>=0?"+":""}$${metrics.estimatedProfit.toFixed(3)}m</strong></span>
@@ -2813,6 +2838,7 @@ function renderFacilities() {
       ["Level",facility.level],
       ["Last units",facility.lastUnits.toLocaleString()],
       ["Marketing",`$${facility.marketing}k/day`],
+      ["Mktg cost",`$${(metrics.marketingCost/1000).toFixed(0)}k/day`],
       ["Last profit",`$${facility.profit.toFixed(3)}m`],
       ["Competitor",money.format(metrics.competitorPrice)],
       ["Margin",pct(metrics.grossMargin)]
@@ -2822,9 +2848,9 @@ function renderFacilities() {
       <div class="facility-controls">
         <label>Price <strong>${money.format(metrics.price)}</strong><input data-facility-control="${facility.id}" data-field="price" type="range" min="${priceMin}" max="${priceMax}" step="1" value="${Math.round(metrics.price)}"></label>
         <label>Production <strong>${metrics.capacity.toLocaleString()}/day</strong><input data-facility-control="${facility.id}" data-field="productionTarget" type="range" min="1" max="${capacityMax}" step="1" value="${Math.round(metrics.capacity)}"></label>
-        <label>Marketing <strong>$${facility.marketing}k/day</strong><input data-facility-control="${facility.id}" data-field="marketing" type="range" min="0" max="300" step="5" value="${facility.marketing}"></label>
+        <label>Marketing <strong>$${facility.marketing}k/day</strong><input data-facility-control="${facility.id}" data-field="marketing" type="range" min="0" max="120" step="2" value="${facility.marketing}"></label>
       </div>
-      <button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$20k/day ($1m)</button></article>`;
+      <button data-upgrade-facility="${facility.id}">Upgrade ($${4+facility.level*3}m)</button><button data-market-facility="${facility.id}">Marketing +$8k/day ($0.25m)</button></article>`;
   }).join(""):`<div class="builder-card"><h3>No facilities yet</h3><p>Start small: build an industry for raw materials, a factory to make goods, and a store to sell them.</p></div>`;
   document.querySelectorAll("[data-select-facility]").forEach(card=>card.onclick=event=>{if(event.target.closest("button,input,label"))return;state.selectedFacilityId=+card.dataset.selectFacility;render();});
   document.querySelectorAll("[data-upgrade-facility]").forEach(button=>button.onclick=()=>upgradeFacility(+button.dataset.upgradeFacility));
@@ -2935,7 +2961,7 @@ document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelect
 document.querySelector("#audio-toggle").onclick=toggleAudio;
 document.querySelector("#time-toggle").onclick=toggleTime;
 document.querySelector("#time-speed").onchange=event=>{ensureStateDefaults();state.autoTime.speed=+event.target.value||1;state.autoTime.accumulator=0;};
-document.querySelector("#show-advisor").onclick=()=>{state.advisorHidden=false;render();}; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
+document.querySelector("#show-advisor").onclick=showAdvisorPanel; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
 document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
 document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});
