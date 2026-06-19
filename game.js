@@ -69,6 +69,7 @@ const state = {
 };
 const SAVE_KEY="market-foundry-save-v5";
 const SAVE_PROFILE_KEY="market-foundry-save-profile-v1";
+const CLOUD_PENDING_KEY="market-foundry-cloud-pending-v1";
 const MODE_KEY="market-foundry-mode";
 const TRADING_DAYS_PER_YEAR=240;
 const CAMPAIGN_YEARS=10;
@@ -1018,26 +1019,31 @@ function saveProfilePayload(email, companyName) {
   const now=new Date().toISOString();
   const existing=JSON.parse(localStorage.getItem(SAVE_PROFILE_KEY) || "null");
   const payload=makeSavePayload();
-  // TODO: Send this exact save profile structure to Supabase/Firebase/backend
-  // when online saves are implemented. For now it is stored only in localStorage.
   return {
     email:email.toLowerCase(),
     companyName,
+    savePayload:payload,
     gameState:payload.gameState,
     currentMode:payload.currentMode,
+    currentMission:payload.currentMission,
     completedMissions:payload.completedMissions,
     unlockedScreens:payload.unlockedScreens,
+    companyStats:payload.companyStats,
+    playerDecisions:payload.playerDecisions,
+    reports:payload.reports,
     createdAt:existing?.createdAt || now,
     lastSavedAt:now
   };
 }
 
-function openSaveProfile() {
+function openSaveProfile(mode="save") {
   const modal=document.querySelector("#save-profile-modal");
   const profile=JSON.parse(localStorage.getItem(SAVE_PROFILE_KEY) || "null");
+  modal.dataset.mode=mode;
   document.querySelector("#profile-email").value=profile?.email || "";
   document.querySelector("#profile-company").value=state.player?.companyName || companies[0].name || profile?.companyName || "";
-  document.querySelector("#profile-status").textContent="Your game is saved locally in this browser.";
+  document.querySelector("#profile-save").textContent=mode==="load"?"Load saved game":"Save my game";
+  document.querySelector("#profile-status").textContent=mode==="load"?"Enter your email to load your cloud save.":"Your game is saved locally in this browser.";
   modal.classList.remove("hidden");
 }
 
@@ -1045,24 +1051,42 @@ function closeSaveProfile() {
   document.querySelector("#save-profile-modal").classList.add("hidden");
 }
 
-function saveProfileLocally() {
+function readProfileForm() {
   const email=document.querySelector("#profile-email").value.trim();
   const companyName=(document.querySelector("#profile-company").value.trim() || state.player?.companyName || companies[0].name || "Nova Devices");
+  return {email,companyName};
+}
+
+function saveProfileLocally(statusText="Saved locally. You can continue playing without saving online.") {
+  const {email,companyName}=readProfileForm();
   if (!email || !email.includes("@")) {
     document.querySelector("#profile-status").textContent="Enter an email to create a save profile.";
     document.querySelector("#profile-status").className="down";
-    return;
+    return null;
   }
   if (state.player) state.player.companyName=companyName;
   companies[0].name=companyName;
   const profile=saveProfilePayload(email,companyName);
   localStorage.setItem(SAVE_PROFILE_KEY,JSON.stringify(profile));
   localStorage.setItem(SAVE_KEY,JSON.stringify(makeSavePayload()));
-  document.querySelector("#profile-status").textContent="Saved locally. Online save is coming soon. You can continue playing without saving online.";
+  document.querySelector("#profile-status").textContent=statusText;
   document.querySelector("#profile-status").className="up";
   document.querySelector("#status-headline").textContent="Your game is saved locally in this browser.";
   updateLocalSaveStatus();
   playCue("order");
+  return profile;
+}
+
+async function submitSaveProfile() {
+  const modal=document.querySelector("#save-profile-modal");
+  if (modal?.dataset.mode==="load") return loadOnlineProfile();
+  const profile=saveProfileLocally("Saved locally. Preparing cloud save...");
+  if (!profile) return false;
+  if (!supabaseClient) {
+    explainCloudSetup();
+    return false;
+  }
+  return saveOnlineProfile(profile);
 }
 
 function updateLocalSaveStatus() {
@@ -1110,9 +1134,9 @@ function updateCloudStatus(text, good=null) {
   let next=text;
   if (!next) {
     if (!window.supabase) next="Cloud library could not load. Local saves still work.";
-    else if (!config.url || !config.anonKey) next="Online save is coming soon. Your game is currently saved in this browser.";
+    else if (!config.url || !config.anonKey) next="Cloud save is not configured. Your game is saved locally in this browser.";
     else if (currentUser) next=`Signed in as ${currentUser.email}. Cloud saves are ready.`;
-    else next="Online save is coming soon. Your game is currently saved in this browser.";
+    else next="Cloud save is ready. Enter your email to receive a secure save-game link.";
   }
   status.textContent=next;
   status.className=good===null ? "" : good ? "up" : "down";
@@ -1132,12 +1156,18 @@ function initCloud() {
   const config=cloudConfig();
   if (!window.supabase || !config.url || !config.anonKey) { updateCloudStatus(); return; }
   supabaseClient=window.supabase.createClient(config.url,config.anonKey);
-  supabaseClient.auth.getUser().then(({data})=>{
-    currentUser=data.user;
+  supabaseClient.auth.getSession().then(({data})=>{
+    currentUser=data.session?.user || null;
     if (currentUser && location.hash.includes("access_token")) history.replaceState(null,"",location.pathname+location.search);
     updateCloudStatus();
+    runPendingCloudAction();
   });
-  supabaseClient.auth.onAuthStateChange((_event,session)=>{ currentUser=session?session.user:null; updateCloudStatus(); });
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{
+    currentUser=session?session.user:null;
+    if (currentUser && location.hash.includes("access_token")) history.replaceState(null,"",location.pathname+location.search);
+    updateCloudStatus();
+    runPendingCloudAction();
+  });
 }
 
 function authFields() {
@@ -1155,14 +1185,140 @@ async function addEmailSubscriber(email, source="signup") {
   return null;
 }
 
+async function sendMagicLink(email, action="save") {
+  if (!supabaseClient) return explainCloudSetup();
+  if (!email || !email.includes("@")) {
+    updateCloudStatus("Enter your email first.",false);
+    return false;
+  }
+  localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify({action,email:email.toLowerCase(),createdAt:new Date().toISOString()}));
+  const {error}=await supabaseClient.auth.signInWithOtp({
+    email,
+    options:{emailRedirectTo:authRedirectUrl(),shouldCreateUser:true}
+  });
+  if (error) {
+    updateCloudStatus(error.message,false);
+    document.querySelector("#profile-status").textContent=error.message;
+    document.querySelector("#profile-status").className="down";
+    return false;
+  }
+  const text=action==="load"
+    ? "Check your email for a secure link. After signing in, your cloud save will load here."
+    : "Check your email for a secure link. After signing in, your current local game will save online.";
+  updateCloudStatus(text,true);
+  document.querySelector("#profile-status").textContent=text;
+  document.querySelector("#profile-status").className="up";
+  document.querySelector("#status-headline").textContent="Save-game email link sent.";
+  playCue("order");
+  return true;
+}
+
+function cloudSaveRecord(profile) {
+  return {
+    user_id:currentUser.id,
+    slot:"main",
+    payload:profile,
+    updated_at:new Date().toISOString()
+  };
+}
+
+function cloudErrorMessage(error, action) {
+  if (error?.code==="PGRST205" || /saved_games/i.test(error?.message||"")) {
+    return `Cloud ${action} needs database setup. Run supabase-schema.sql in Supabase SQL Editor, then try again.`;
+  }
+  return `Cloud ${action} failed: ${error?.message || "Unknown error"}`;
+}
+
+async function saveOnlineProfile(profile) {
+  if (!supabaseClient) return explainCloudSetup();
+  if (!currentUser) return sendMagicLink(profile.email,"save");
+  const {error}=await supabaseClient
+    .from("saved_games")
+    .upsert(cloudSaveRecord(profile),{onConflict:"user_id,slot"});
+  if (error) {
+    const text=cloudErrorMessage(error,"save");
+    updateCloudStatus(text,false);
+    document.querySelector("#profile-status").textContent=text;
+    document.querySelector("#profile-status").className="down";
+    playCue("error");
+    return false;
+  }
+  localStorage.removeItem(CLOUD_PENDING_KEY);
+  const text=`Cloud save complete for ${profile.email}.`;
+  updateCloudStatus(text,true);
+  document.querySelector("#profile-status").textContent=text;
+  document.querySelector("#profile-status").className="up";
+  document.querySelector("#status-headline").textContent="Game saved online.";
+  message("Game saved online.",true);
+  playCue("win");
+  return true;
+}
+
+async function loadOnlineProfile() {
+  if (!supabaseClient) return explainCloudSetup();
+  if (!currentUser) {
+    const {email}=readProfileForm();
+    return sendMagicLink(email,"load");
+  }
+  const {data,error}=await supabaseClient
+    .from("saved_games")
+    .select("payload,updated_at")
+    .eq("user_id",currentUser.id)
+    .eq("slot","main")
+    .maybeSingle();
+  if (error) {
+    const text=cloudErrorMessage(error,"load");
+    updateCloudStatus(text,false);
+    document.querySelector("#profile-status").textContent=text;
+    document.querySelector("#profile-status").className="down";
+    playCue("error");
+    return false;
+  }
+  if (!data?.payload) {
+    const text="No cloud save was found for this signed-in email.";
+    updateCloudStatus(text,false);
+    document.querySelector("#profile-status").textContent=text;
+    document.querySelector("#profile-status").className="down";
+    return false;
+  }
+  const profile=data.payload;
+  const savePayload=profile.savePayload || profile.gameState || profile;
+  localStorage.setItem(SAVE_PROFILE_KEY,JSON.stringify(profile));
+  localStorage.setItem(SAVE_KEY,JSON.stringify(savePayload));
+  localStorage.removeItem(CLOUD_PENDING_KEY);
+  closeSaveProfile();
+  applySavePayload(savePayload,`Cloud save loaded from ${new Date(data.updated_at || profile.lastSavedAt).toLocaleString()}.`);
+  updateCloudStatus("Cloud save loaded.",true);
+  document.querySelector("#status-headline").textContent="Cloud save loaded.";
+  playCue("win");
+  return true;
+}
+
+async function runPendingCloudAction() {
+  if (!currentUser) return;
+  let pending=null;
+  try { pending=JSON.parse(localStorage.getItem(CLOUD_PENDING_KEY) || "null"); } catch { pending=null; }
+  if (!pending) return;
+  if (pending.action==="load") {
+    openSaveProfile();
+    document.querySelector("#profile-email").value=currentUser.email || pending.email || "";
+    await loadOnlineProfile();
+    return;
+  }
+  const profileRaw=localStorage.getItem(SAVE_PROFILE_KEY);
+  const localRaw=localStorage.getItem(SAVE_KEY);
+  let profile=profileRaw ? JSON.parse(profileRaw) : null;
+  if (!profile && localRaw) {
+    profile=saveProfilePayload(currentUser.email || pending.email,state.player?.companyName || companies[0].name || "Nova Devices");
+    localStorage.setItem(SAVE_PROFILE_KEY,JSON.stringify(profile));
+  }
+  if (profile) await saveOnlineProfile(profile);
+}
+
 async function signUp() {
   if (!supabaseClient) return explainCloudSetup();
   const {email,password}=authFields();
-  if (!email || password.length<6) return updateCloudStatus("Enter an email and a password with at least 6 characters.",false);
-  const redirectTo=authRedirectUrl();
-  const {error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
-  if (error) return updateCloudStatus(error.message,false);
-  updateCloudStatus("Check your email for save-game access.",true);
+  return sendMagicLink(email,"save");
 }
 
 async function resendConfirmation() {
@@ -1187,11 +1343,8 @@ async function resetPassword() {
 
 async function signIn() {
   if (!supabaseClient) return explainCloudSetup();
-  const {email,password}=authFields();
-  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if (error) return updateCloudStatus(error.message,false);
-  currentUser=data.user;
-  updateCloudStatus();
+  const {email}=authFields();
+  return sendMagicLink(email,"save");
 }
 
 async function signOut() {
@@ -1201,19 +1354,25 @@ async function signOut() {
 }
 
 async function cloudSaveGame() {
-  openSaveProfile();
+  openSaveProfile("save");
+  const text=currentUser
+    ? "You are signed in. Press Save my game to save this company online."
+    : "Enter your email and press Save my game. We will send a secure save-game link if needed.";
+  document.querySelector("#profile-status").textContent=text;
+  document.querySelector("#profile-status").className="";
   message("Email is only used to save your game. You can continue playing without saving online.",true);
-  // TODO: When backend save is ready, submit saveProfilePayload() to Supabase/Firebase here.
 }
 
 async function cloudLoadGame() {
-  openSaveProfile();
-  const text="Online save is coming soon. Your game is currently saved in this browser.";
+  openSaveProfile("load");
+  const text=currentUser
+    ? "Loading your signed-in cloud save..."
+    : "Enter your email, then press Load saved game to receive a secure link. After signing in, your cloud save will load.";
   document.querySelector("#profile-status").textContent=text;
   document.querySelector("#profile-status").className="";
   message(text,true);
   document.querySelector("#status-headline").textContent=text;
-  // TODO: When backend save is ready, recover a save profile by email here.
+  if (currentUser) loadOnlineProfile();
 }
 
 function newGame(startTutorial=false, mode="guided") {
@@ -1905,6 +2064,7 @@ function renderTimeGuidance() {
   if (!hint) return;
   const running=Boolean(state.autoTime?.running);
   hint.textContent=running?"Tiden kører. Tryk Stop time hvis du vil pause.":"Husk at starte tiden, når du er klar.";
+  hint.textContent=running?"Time is running. Press Stop time to pause.":"Remember to start time when you are ready.";
   hint.classList.toggle("running",running);
 }
 
@@ -2781,7 +2941,7 @@ document.querySelector("#buy-option").onclick=buyOption; document.querySelector(
 document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});
 document.querySelector("#save-game").onclick=saveGame; document.querySelector("#load-game").onclick=loadGame; document.querySelector("#new-game").onclick=openLaunchModal; document.querySelector("#modal-button").onclick=()=>newGame(true,"guided");
 document.querySelector("#cloud-save").onclick=cloudSaveGame; document.querySelector("#cloud-load").onclick=cloudLoadGame;
-document.querySelector("#profile-save").onclick=saveProfileLocally; document.querySelector("#profile-close").onclick=closeSaveProfile;
+document.querySelector("#profile-save").onclick=submitSaveProfile; document.querySelector("#profile-close").onclick=closeSaveProfile;
 document.querySelector("#launch-start").onclick=()=>newGame(true,"guided");
 document.querySelector("#launch-expert").onclick=()=>startExpertMode(false);
 document.querySelector("#launch-load").onclick=()=>loadGame();

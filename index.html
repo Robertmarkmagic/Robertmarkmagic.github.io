@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=firm-commodity-gameplay-v1">
+  <link rel="stylesheet" href="styles.css?v=online-save-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -16,7 +16,7 @@
       <div id="header-brand-mark" class="header-brand-mark"></div>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">Husk at starte tiden, når du er klar.</span></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">Remember to start time when you are ready.</span></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -69,7 +69,7 @@
     </section>
 
     <section id="learning-center" class="learning-center panel hidden">
-      <div class="panel-title"><div><h2>Business Learning Center</h2><span>Frivillig undervisning: læs kun når du selv vælger det</span></div><strong id="learning-center-status"></strong></div>
+      <div class="panel-title"><div><h2>Business Learning Center</h2><span>Optional lessons: read only when you choose to learn</span></div><strong id="learning-center-status"></strong></div>
       <div class="learning-grid">
         <div class="learning-overview">
           <p class="eyebrow">CURRENT COURSE</p>
@@ -349,7 +349,7 @@
       <p class="eyebrow">SAVE PROFILE</p>
       <h2>Save your game</h2>
       <p>Enter your email to save your company and continue later.</p>
-      <p class="save-copy-small">Email is only used to save your game. Online save is coming soon. Your game is currently saved in this browser.</p>
+      <p class="save-copy-small">Email is only used to save your game. If you are not signed in yet, we will send a secure save-game link.</p>
       <label>Email<input id="profile-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
       <label>Company name<input id="profile-company" maxlength="32" placeholder="Nova Devices"></label>
       <div class="save-profile-actions"><button id="profile-save" class="primary">Save my game</button><button id="profile-close">Continue playing without saving online</button></div>
@@ -383,6 +383,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=firm-commodity-gameplay-v1"></script>
+  <script src="game.js?v=online-save-v1"></script>
 </body>
 </html>
