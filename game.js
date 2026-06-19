@@ -65,6 +65,11 @@ const state = {
   selectedFacilityId:null,
   bankDebt:0, bankRate:.085, lastBankInterest:0,
   missions:{selected:"save-nova", completed:[], profitableDays:0, lastProfitDay:0, priceAdjusted:false, productionAdjusted:false, marketingAdjusted:false, researchAdjusted:false},
+  founder:{xp:0, level:0, xpLog:[]},
+  achievements:{unlocked:[]},
+  records:{highestWeeklyRevenue:0, highestWeeklyProfit:-999, highestDailyProfit:-999, highestCompanyCash:0, bestSatisfaction:0, bestPortfolioReturn:0},
+  streaks:{profitableDays:0, satisfactionDays:0, noStockoutDays:0},
+  weekly:{startDay:1, revenue:0, profit:0, xpEarned:0, summaries:[]},
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
@@ -152,6 +157,28 @@ const learningMissions = [
   {id:"unlock-market",title:"Make Your First Trade",description:"Buy one listed stock so you can see how a portfolio moves beside your operating business.",reward:"Practice portfolio basics.",unlock:"Empire"},
   {id:"supply-chain",title:"Build Your First Supply Chain",description:"Build a facility or improve one. Learn how inputs, output, capacity, and marketing create an operating business.",reward:"Practice supply-chain building.",unlock:"Founder Empire"},
   {id:"build-empire",title:"Build Your Empire",description:"Run at least two active business assets: a second facility, a second product line, or a larger upgraded operation.",reward:"Practice advanced expansion.",unlock:"Finance + Options + M&A"}
+];
+
+const founderLevelCatalog = [
+  {xp:0,name:"First-Time Founder",reward:"Basic operating dashboard"},
+  {xp:120,name:"Small Business Owner",reward:"Progress tracking and advisor briefs"},
+  {xp:300,name:"Growth Operator",reward:"Weekly business review"},
+  {xp:650,name:"Market Strategist",reward:"Advanced portfolio discipline"},
+  {xp:1100,name:"Industry Leader",reward:"Empire-building mindset"},
+  {xp:1700,name:"Empire Builder",reward:"Multi-business operating rhythm"},
+  {xp:2500,name:"Market Legend",reward:"Full command of the simulator"}
+];
+
+const achievementCatalog = [
+  {id:"first-trade",icon:"TR",name:"First Trade",description:"Place your first stock market trade.",xp:20,condition:()=>state.ledger.some(item=>/^(Bought|Sold)/.test(item.text))},
+  {id:"first-profit",icon:"P+",name:"First Profit",description:"Produce one profitable operating day.",xp:30,condition:()=>companies[0].dailyOperatingProfit>0},
+  {id:"week-survivor",icon:"7D",name:"First Week Survived",description:"Reach day 8 with positive company cash.",xp:35,condition:()=>state.day>=8 && companies[0].companyCash>0},
+  {id:"customer-favorite",icon:"CS",name:"Customer Favorite",description:"Reach 85 customer satisfaction.",xp:45,condition:()=>businessSignals().satisfaction>=85},
+  {id:"brand-builder",icon:"BR",name:"Brand Builder",description:"Reach a brand score of 90.",xp:45,condition:()=>businessSignals().brand>=90},
+  {id:"supply-builder",icon:"SC",name:"Supply Chain Builder",description:"Operate three facilities.",xp:60,condition:()=>state.facilities.length>=3},
+  {id:"cash-cushion",icon:"CA",name:"Cash Cushion",description:"Build Nova company cash above $60m.",xp:50,condition:()=>companies[0].companyCash>=60},
+  {id:"deal-maker",icon:"MA",name:"Deal Maker",description:"Buy a strategic stake or control a subsidiary.",xp:70,condition:()=>companies.slice(1).some(target=>target.novaStake>=.1 || target.controlled)},
+  {id:"portfolio-comeback",icon:"PV",name:"Portfolio Builder",description:"Grow personal net worth 10% above your starting capital.",xp:55,condition:()=>accountEquity()>=state.startWorth*1.1}
 ];
 
 const learningTracks = [
@@ -300,10 +327,122 @@ function addLedger(text,amount) {
 let toastTimer;
 function showExecutionToast(text) {
   const toast=document.querySelector("#execution-toast");
+  if (!toast) return;
   toast.querySelector("span").textContent=text;
   toast.classList.remove("hidden");
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200);
+}
+
+function currentFounderLevel() {
+  const xp=state.founder?.xp || 0;
+  return founderLevelCatalog.slice().reverse().find(level=>xp>=level.xp) || founderLevelCatalog[0];
+}
+
+function nextFounderLevel() {
+  const xp=state.founder?.xp || 0;
+  return founderLevelCatalog.find(level=>level.xp>xp) || null;
+}
+
+function awardXP(amount, reason) {
+  ensureStateDefaults();
+  amount=Math.max(0,Math.round(amount));
+  if (!amount) return;
+  const before=currentFounderLevel();
+  state.founder.xp+=amount;
+  state.weekly.xpEarned=(state.weekly.xpEarned||0)+amount;
+  state.founder.xpLog.unshift({day:state.day,amount,reason});
+  state.founder.xpLog=state.founder.xpLog.slice(0,12);
+  const after=currentFounderLevel();
+  if (after.name!==before.name) {
+    addLedger(`Founder level up: ${after.name}`,0);
+    state.news.unshift({day:state.day,ticker:"XP",impact:.02,text:`Founder level up: ${after.name}. ${after.reward}.`});
+    state.news=state.news.slice(0,6);
+    showExecutionToast(`LEVEL UP: ${after.name}`);
+    playCue("win");
+  }
+}
+
+function unlockAchievement(id) {
+  ensureStateDefaults();
+  if (state.achievements.unlocked.includes(id)) return false;
+  const achievement=achievementCatalog.find(item=>item.id===id);
+  if (!achievement) return false;
+  state.achievements.unlocked.push(id);
+  awardXP(achievement.xp, achievement.name);
+  addLedger(`Achievement unlocked: ${achievement.name}`,0);
+  state.news.unshift({day:state.day,ticker:"ACH",impact:.01,text:`Achievement unlocked: ${achievement.name}. ${achievement.description}`});
+  state.news=state.news.slice(0,6);
+  showExecutionToast(`${achievement.name} unlocked +${achievement.xp} XP`);
+  return true;
+}
+
+function checkAchievements() {
+  achievementCatalog.forEach(achievement=>{
+    if (!state.achievements.unlocked.includes(achievement.id) && achievement.condition()) unlockAchievement(achievement.id);
+  });
+}
+
+function updatePersonalRecords() {
+  const c=companies[0], signals=businessSignals();
+  const records=[
+    ["highestDailyProfit",c.dailyOperatingProfit,"New daily profit record",`Daily profit reached $${c.dailyOperatingProfit.toFixed(2)}m.`],
+    ["highestCompanyCash",c.companyCash,"New cash record",`Company cash reached $${c.companyCash.toFixed(2)}m.`],
+    ["bestSatisfaction",signals.satisfaction,"New satisfaction record",`Customer satisfaction reached ${signals.satisfaction}/100.`],
+    ["bestPortfolioReturn",accountEquity()/state.startWorth-1,"New portfolio return record",`Return reached ${pct(accountEquity()/state.startWorth-1)}.`]
+  ];
+  records.forEach(([key,value,title,body])=>{
+    if (value>state.records[key]+(key==="bestPortfolioReturn" ? .002 : .01)) {
+      const old=state.records[key];
+      state.records[key]=value;
+      if (old && state.day>1) {
+        awardXP(10,title);
+        showExecutionToast(`${title}: ${body}`);
+      }
+    }
+  });
+}
+
+function completeWeeklySummary() {
+  const c=companies[0], revenue=state.weekly.revenue||0, profit=state.weekly.profit||0;
+  const profitable=profit>0, growingCash=c.companyCash>=state.records.highestCompanyCash*.92;
+  // REWARD TUNING:
+  // Weekly XP should feel motivating without turning the sim into a clicker.
+  // Increase base, profitBonus, or growthBonus for a more arcade-like pace.
+  const base=18, profitBonus=profitable?18:0, growthBonus=growingCash?8:0, missionBonus=(state.missions.completed.length||0)*2;
+  const xp=base+profitBonus+growthBonus+Math.min(20,missionBonus);
+  awardXP(xp, "Weekly business review");
+  const best = profitable ? "You created positive weekly operating profit." : "You survived the week, but operations still need margin or volume.";
+  const advice = profit<0 ? "Cut weak spending, raise price if demand allows, or build supply where demand is strongest." :
+    c.inventory>9000 ? "Inventory is tying up cash. Lower production or improve sales capacity." :
+    "Keep comparing price, demand, production, marketing cost, and cash after each change.";
+  const summary={day:state.day,from:state.weekly.startDay,to:state.day,revenue,profit,xp,best,advice};
+  state.weekly.summaries.unshift(summary);
+  state.weekly.summaries=state.weekly.summaries.slice(0,8);
+  if (revenue>state.records.highestWeeklyRevenue) state.records.highestWeeklyRevenue=revenue;
+  if (profit>state.records.highestWeeklyProfit) state.records.highestWeeklyProfit=profit;
+  addLedger(`Weekly review: ${profit>=0?"+":""}$${profit.toFixed(2)}m profit`,0);
+  showExecutionToast(`Weekly review complete +${xp} XP`);
+  state.weekly.startDay=state.day+1;
+  state.weekly.revenue=0;
+  state.weekly.profit=0;
+  state.weekly.xpEarned=0;
+}
+
+function updateRewardSystems() {
+  ensureStateDefaults();
+  const c=companies[0], signals=businessSignals();
+  const operatingRevenue=c.dailyRevenue||0, operatingProfit=c.dailyOperatingProfit||0;
+  state.weekly.revenue+=operatingRevenue;
+  state.weekly.profit+=operatingProfit;
+  state.streaks.profitableDays=operatingProfit>0?state.streaks.profitableDays+1:0;
+  state.streaks.satisfactionDays=signals.satisfaction>=75?state.streaks.satisfactionDays+1:0;
+  state.streaks.noStockoutDays=c.dailySales>0 && c.inventory>c.dailySales*.25?state.streaks.noStockoutDays+1:0;
+  if (operatingProfit>0) awardXP(4,"Profitable operating day");
+  if (state.streaks.profitableDays && state.streaks.profitableDays%5===0) awardXP(12,`${state.streaks.profitableDays}-day profit streak`);
+  updatePersonalRecords();
+  checkAchievements();
+  if ((state.day-state.weekly.startDay+1)>=5) completeWeeklySummary();
 }
 
 function ensureAudio() {
@@ -394,6 +533,26 @@ function ensureStateDefaults() {
   if (!Number.isFinite(state.lastBusinessProfit)) state.lastBusinessProfit=0;
   if (!Number.isFinite(state.lastFounderPayout)) state.lastFounderPayout=0;
   if (!state.autoTime) state.autoTime={running:false,speed:1,accumulator:0};
+  if (!state.founder) state.founder={xp:0,level:0,xpLog:[]};
+  if (!Number.isFinite(state.founder.xp)) state.founder.xp=0;
+  if (!Array.isArray(state.founder.xpLog)) state.founder.xpLog=[];
+  if (!state.achievements) state.achievements={unlocked:[]};
+  if (!Array.isArray(state.achievements.unlocked)) state.achievements.unlocked=[];
+  if (!state.records) state.records={};
+  state.records.highestWeeklyRevenue=Number.isFinite(state.records.highestWeeklyRevenue)?state.records.highestWeeklyRevenue:0;
+  state.records.highestWeeklyProfit=Number.isFinite(state.records.highestWeeklyProfit)?state.records.highestWeeklyProfit:-999;
+  state.records.highestDailyProfit=Number.isFinite(state.records.highestDailyProfit)?state.records.highestDailyProfit:-999;
+  state.records.highestCompanyCash=Number.isFinite(state.records.highestCompanyCash)?state.records.highestCompanyCash:0;
+  state.records.bestSatisfaction=Number.isFinite(state.records.bestSatisfaction)?state.records.bestSatisfaction:0;
+  state.records.bestPortfolioReturn=Number.isFinite(state.records.bestPortfolioReturn)?state.records.bestPortfolioReturn:0;
+  if (!state.streaks) state.streaks={profitableDays:0,satisfactionDays:0,noStockoutDays:0};
+  ["profitableDays","satisfactionDays","noStockoutDays"].forEach(key=>{if(!Number.isFinite(state.streaks[key])) state.streaks[key]=0;});
+  if (!state.weekly) state.weekly={startDay:state.day,revenue:0,profit:0,xpEarned:0,summaries:[]};
+  if (!Number.isFinite(state.weekly.startDay)) state.weekly.startDay=state.day;
+  if (!Number.isFinite(state.weekly.revenue)) state.weekly.revenue=0;
+  if (!Number.isFinite(state.weekly.profit)) state.weekly.profit=0;
+  if (!Number.isFinite(state.weekly.xpEarned)) state.weekly.xpEarned=0;
+  if (!Array.isArray(state.weekly.summaries)) state.weekly.summaries=[];
   ensureMissionDefaults();
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
 }
@@ -476,6 +635,7 @@ function advanceDay(renderAfter=true) {
   checkProgression();
   state.equityHistory.push(accountEquity());
   state.equityHistory=state.equityHistory.slice(-60);
+  updateRewardSystems();
   autoSaveLocal("advance-day");
   if (renderAfter) render();
   return !state.gameOver;
@@ -1765,18 +1925,21 @@ function applyManagementDecisions() {
     production:+document.querySelector("#production").value,
     marketing:+document.querySelector("#marketing").value
   };
+  const research=+document.querySelector("#research").value;
   Object.assign(product,decisions);
-  company.research=+document.querySelector("#research").value;
+  company.research=research;
   company.pendingDecisions=null;
+  const estimate=estimateManagementImpact(product,{...decisions,research});
+  const spend=(decisions.marketing+research)/1000;
   addLedger(`Updated ${product.name} strategy`,0);
   evaluateMissions();
   playCue("order");
   render();
   const button=document.querySelector("#apply-decisions"), feedback=document.querySelector("#management-feedback");
   document.querySelector("#operations-status").textContent="Decisions applied";
-  document.querySelector("#management-advice").textContent="Management decisions are active now. Advance time to see the sales and profit impact.";
-  document.querySelector("#status-headline").textContent=`${product.name} strategy updated: price ${money.format(product.price)}, production ${product.production.toLocaleString()} units.`;
-  message("Management decisions applied. Advance time to see the new results.",true);
+  document.querySelector("#management-advice").textContent=`Forecast: ${estimate.demand.toLocaleString()} demand, ${estimate.sold.toLocaleString()} possible sales, ${estimate.profit>=0?"+":""}$${estimate.profit.toFixed(2)}m profit after $${spend.toFixed(2)}m daily marketing and research spend.`;
+  document.querySelector("#status-headline").textContent=`${product.name} strategy updated: price ${money.format(product.price)}, production ${product.production.toLocaleString()} units, forecast ${estimate.profit>=0?"+":""}$${estimate.profit.toFixed(2)}m.`;
+  message(`Applied. Forecast: ${estimate.sold.toLocaleString()} sales and ${estimate.profit>=0?"+":""}$${estimate.profit.toFixed(2)}m next-day profit.`,true);
   button.textContent="Applied - run time to see result";
   button.classList.add("applied");
   feedback?.classList.add("flash");
@@ -1936,9 +2099,11 @@ function evaluateMissions() {
   const mission=currentMission();
   if (mission && missionComplete(mission) && !state.missions.completed.includes(mission.id)) {
     state.missions.completed.push(mission.id);
+    awardXP(55, `Challenge complete: ${mission.title}`);
     addLedger(`Task complete: ${mission.title}`,0);
     state.news.unshift({day:state.day,ticker:"TASK",impact:.01,text:`Challenge complete: ${mission.title}. ${mission.reward}`});
     state.news=state.news.slice(0,6);
+    showExecutionToast(`Challenge complete: ${mission.title} +55 XP`);
   }
 }
 
@@ -2114,6 +2279,7 @@ function renderDashboard(worth,investments) {
   document.querySelector("#trades-today").textContent=state.ledger.filter(item=>item.day===state.day&&/^(Bought|Sold)/.test(item.text)).length;
   document.querySelector("#orders-count").textContent=state.openOrders.length;
   renderMissionDashboard();
+  renderFounderRewards();
 }
 
 function renderMissionDashboard() {
@@ -2131,7 +2297,7 @@ function renderMissionDashboard() {
     document.querySelector("#mission-kicker").textContent="LEARN ON DEMAND - NO REQUIRED TUTORIAL";
     document.querySelector("#mission-title").textContent=`Learn: ${lesson.title}`;
     document.querySelector("#mission-description").textContent=lesson.description;
-    document.querySelector("#mission-objectives").innerHTML=lesson.levels.map((label,index)=>`<div class="mission-objective optional"><span>Level ${index+1}: ${label}</span><strong>Optional</strong></div>`).join("");
+    document.querySelector("#mission-objectives").innerHTML=`<div class="mission-progress-card"><strong>Self-paced learning</strong><div class="progress-meter"><i style="width:100%"></i></div><span>No pressure. Read when you want, then jump into the matching game system.</span></div>`+lesson.levels.map((label,index)=>`<div class="mission-objective optional"><span>Level ${index+1}: ${label}</span><strong>Optional</strong></div>`).join("");
     document.querySelector(".mission-report h3").textContent="Business lesson";
     document.querySelector("#mission-report").innerHTML=[
       ["Case",lesson.case],
@@ -2150,7 +2316,8 @@ function renderMissionDashboard() {
   if (selector) {
     selector.innerHTML=learningMissions.map((item,index)=>`<option value="${item.id}" ${item.id===mission.id?"selected":""}>${state.missions.completed.includes(item.id)?"✓ ":""}${index+1}. ${item.title}</option>`).join("");
   }
-  document.querySelector("#mission-objectives").innerHTML=missionObjectives(mission).map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
+  const objectives=missionObjectives(mission), doneCount=objectives.filter(item=>item[1]).length, progress=objectives.length?Math.round(doneCount/objectives.length*100):0;
+  document.querySelector("#mission-objectives").innerHTML=`<div class="mission-progress-card"><strong>${progress}% complete</strong><div class="progress-meter"><i style="width:${progress}%"></i></div><span>${doneCount} of ${objectives.length} goals complete. Optional challenge, never a lock.</span></div>`+objectives.map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
   document.querySelector("#mission-report").innerHTML=[
     ["Cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0],
     ["Payout",money.format(state.lastFounderPayout||0),(state.lastFounderPayout||0)>0],
@@ -2162,6 +2329,31 @@ function renderMissionDashboard() {
     ["Brand",`${signals.brand}/100`,signals.brand>=50],
     ["Mode",state.mode==="expert"?"Expert Mode":"Guided Mode",true]
   ].map(item=>`<div><span>${item[0]}</span><strong class="${item[2]?"up":"down"}">${item[1]}</strong></div>`).join("");
+}
+
+function renderFounderRewards() {
+  ensureStateDefaults();
+  const level=currentFounderLevel(), next=nextFounderLevel(), xp=state.founder.xp||0;
+  const levelCard=document.querySelector("#founder-level-card");
+  if (levelCard) {
+    const needed=next?next.xp-level.xp:1, gained=next?xp-level.xp:needed, progress=next?clamp(gained/needed*100,0,100):100;
+    levelCard.innerHTML=`<div><span>Founder level</span><strong>${level.name}</strong><small>${xp.toLocaleString()} XP${next?` / ${next.xp.toLocaleString()} XP`:" - max level"}</small></div><div class="progress-meter"><i style="width:${progress}%"></i></div><em>${next?`Next: ${next.name}. ${next.reward}.`:"You reached the current top founder rank."}</em>`;
+  }
+  const strip=document.querySelector("#achievement-strip");
+  if (strip) {
+    const latest=[...state.achievements.unlocked].slice(-5).reverse();
+    strip.innerHTML=`<div><p class="eyebrow">ACHIEVEMENTS</p><h3>${state.achievements.unlocked.length} unlocked</h3></div>`+(latest.length?latest.map(id=>{
+      const item=achievementCatalog.find(achievement=>achievement.id===id);
+      return `<article class="achievement-badge" title="${item.description}"><i>${item.icon}</i><strong>${item.name}</strong><span>+${item.xp} XP</span></article>`;
+    }).join(""):`<p class="reward-empty">Achievements appear here when you trade, make profit, build cash, and grow the empire.</p>`);
+  }
+  const weekly=document.querySelector("#weekly-summary");
+  if (weekly) {
+    const summary=state.weekly.summaries[0];
+    const weekProgress=clamp((state.day-state.weekly.startDay+1)/5*100,0,100);
+    weekly.innerHTML=summary?`<div><p class="eyebrow">WEEKLY REVIEW</p><h3>Days ${summary.from}-${summary.to}</h3><p>${summary.best}</p><p>${summary.advice}</p></div><div class="weekly-kpis"><span>Revenue<strong>$${summary.revenue.toFixed(2)}m</strong></span><span>Profit<strong class="${summary.profit>=0?"up":"down"}">${summary.profit>=0?"+":""}$${summary.profit.toFixed(2)}m</strong></span><span>XP earned<strong>+${summary.xp}</strong></span></div>`:
+      `<div><p class="eyebrow">WEEKLY REVIEW</p><h3>First review in progress</h3><p>Run five in-game days to receive a compact business review with profit, revenue, XP, and advice.</p></div><div class="weekly-kpis"><span>Progress<strong>${Math.round(weekProgress)}%</strong></span><div class="progress-meter"><i style="width:${weekProgress}%"></i></div></div>`;
+  }
 }
 
 function renderMarketOverview() {
