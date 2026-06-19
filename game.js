@@ -1084,7 +1084,7 @@ function campaignScore() {
 function checkCampaignState() {
   const c=companies[0];
   if (accountEquity()<=0) return endGame("Personal bankruptcy","Your trading account has no remaining equity.",false);
-  if (c.companyCash<=0 && c.dailyOperatingProfit<0 && c.bondDebt>=40) return endGame("Corporate bankruptcy","Nova ran out of cash while carrying unsustainable debt.",false);
+  if (c.companyCash<=0 && c.dailyOperatingProfit<0) return endGame("Corporate bankruptcy","Nova ran out of company cash while operations were losing money.",false);
   if (state.day>=CAMPAIGN_DAYS) {
     const s=difficultySettings();
     const won=accountEquity()>=s.targetWorth&&c.marketShare>=s.targetShare&&c.companyCash>0;
@@ -2225,16 +2225,21 @@ function toggleTime() {
   ensureStateDefaults();
   state.autoTime.running=!state.autoTime.running;
   state.autoTime.accumulator=0;
-  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Stop time":"Start time";
   playCue(state.autoTime.running?"day":"click");
   renderTimeGuidance();
 }
 
 function renderTimeGuidance() {
   const hint=document.querySelector("#time-guidance");
-  if (!hint) return;
+  const button=document.querySelector("#time-toggle");
   const running=Boolean(state.autoTime?.running);
-  hint.textContent=running?"Tiden kører. Tryk Stop time hvis du vil pause.":"Husk at starte tiden, når du er klar.";
+  if (button) {
+    button.textContent=running?"Stop time":"Start time";
+    button.classList.toggle("time-start",!running);
+    button.classList.toggle("time-running",running);
+    button.setAttribute("aria-pressed",String(running));
+  }
+  if (!hint) return;
   hint.textContent=running?"Time is running. Press Stop time to pause.":"Remember to start time when you are ready.";
   hint.classList.toggle("running",running);
 }
@@ -2316,6 +2321,7 @@ function renderMissionDashboard() {
   if (selector) {
     selector.innerHTML=learningMissions.map((item,index)=>`<option value="${item.id}" ${item.id===mission.id?"selected":""}>${state.missions.completed.includes(item.id)?"✓ ":""}${index+1}. ${item.title}</option>`).join("");
   }
+  if (selector) selector.innerHTML=learningMissions.map((item,index)=>`<option value="${item.id}" ${item.id===mission.id?"selected":""}>${state.missions.completed.includes(item.id)?"Done - ":""}${index+1}. ${item.title}</option>`).join("");
   const objectives=missionObjectives(mission), doneCount=objectives.filter(item=>item[1]).length, progress=objectives.length?Math.round(doneCount/objectives.length*100):0;
   document.querySelector("#mission-objectives").innerHTML=`<div class="mission-progress-card"><strong>${progress}% complete</strong><div class="progress-meter"><i style="width:${progress}%"></i></div><span>${doneCount} of ${objectives.length} goals complete. Optional challenge, never a lock.</span></div>`+objectives.map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
   document.querySelector("#mission-report").innerHTML=[
@@ -2398,7 +2404,6 @@ function render() {
   checkProgression();
   const company=companies[state.selected], investments=portfolioValue(), worth=accountEquity(), change=(company.price-company.previous)/company.previous;
   document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}, Q${Math.floor(((state.day-1)%TRADING_DAYS_PER_YEAR)/60)+1}, Day ${state.day}`;
-  document.querySelector("#time-toggle").textContent=state.autoTime.running?"Stop time":"Start time";
   renderTimeGuidance();
   document.querySelector("#time-speed").value=String(state.autoTime.speed||1);
   companies[0].name=state.player.companyName||companies[0].name;
@@ -3105,7 +3110,7 @@ function renderTakeovers() {
       <div class="stake-bar"><i style="width:${target.novaStake*200}%"></i></div>
       <div class="takeover-meta"><span>Nova stake<strong>${pct(target.novaStake)}</strong></span><span>Defense premium<strong>${pct(target.takeoverDefense)}</strong></span><span>Next 10%<strong>${money.format(cost*1000000)}</strong></span></div>
       <div class="takeover-actions"><button data-buy-target="${target.ticker}" ${target.controlled||!hasControl()||!featureUnlocked("ma")?"disabled":""}>Buy 10%</button><button data-sell-target="${target.ticker}" ${target.novaStake<.1?"disabled":""}>Sell 10% (${money.format(sellValue*1000000)})</button></div>
-      <p>${synergies[target.ticker]}</p>
+      <p>${synergies[target.ticker] || "Strategic stake adds subsidiary earnings exposure and future deal flexibility."}</p>
     </article>`;
   }).join("");
   document.querySelectorAll("[data-buy-target]").forEach(button=>button.onclick=()=>buyTakeoverBlock(button.dataset.buyTarget));
@@ -3164,8 +3169,6 @@ document.querySelector("#launch-start").onclick=()=>newGame(true,"guided");
 document.querySelector("#launch-expert").onclick=()=>startExpertMode(false);
 document.querySelector("#launch-load").onclick=()=>loadGame();
 document.querySelector("#launch-email-load").onclick=cloudLoadGame;
-const launchExplore=document.querySelector("#launch-explore");
-if (launchExplore) launchExplore.onclick=()=>{document.querySelector("#launch-modal").classList.add("hidden"); message("You are viewing the current board. Use Start new campaign whenever you want a clean run.",true);};
 document.querySelector("#tutorial-next").onclick=nextTutorialStep;
 document.querySelector("#tutorial-skip").onclick=finishTutorial;
 document.querySelector("#difficulty").onchange=()=>{if(state.day>1)message("Difficulty applies when you start a new game.",false);};

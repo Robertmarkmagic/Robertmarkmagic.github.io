@@ -10,6 +10,8 @@ h1,h2,h3,p { margin:0; } h1 { font-size:32px; letter-spacing:-1px; } h2 { font-s
 .eyebrow { color:var(--gold); font-size:11px; font-weight:800; letter-spacing:.14em; }
 button,input,select { font:inherit; } button { cursor:pointer; border:2px outset #398ee4; color:var(--text); background:linear-gradient(#1753a0,#0a3476); border-radius:10px; padding:8px 12px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; } select { color:var(--text); background:#092d68; border:2px inset #398ee4; border-radius:10px; padding:8px; }
 button:hover { border-color:#4a607a; } .clock { display:flex; gap:9px; align-items:center; justify-content:flex-end; flex-wrap:wrap; color:var(--muted); }
+.capital-command .clock #time-toggle.time-start { color:#1d1400; background:linear-gradient(180deg,#fff5a8,#fbbf24 58%,#d68a00); border-color:#fff4a3; box-shadow:0 0 0 2px #fff2a833,0 0 22px #fbbf2477,inset 0 1px 0 #ffffffaa; font-weight:900; }
+.capital-command .clock #time-toggle.time-running { color:#03130d; background:linear-gradient(180deg,#43f0b2,#00d68f 58%,#048a60); border-color:#8af7cf; box-shadow:0 0 18px #00d68f66,inset 0 1px 0 #ffffff88; font-weight:900; }
 .time-guidance { flex-basis:100%; text-align:right; color:#fff6a6; font-weight:800; font-size:12px; }
 .time-guidance.running { color:#00d68f; }
 button:disabled { cursor:not-allowed; opacity:.42; filter:saturate(.4); }
@@ -611,6 +613,8 @@ input,select,textarea { font-size:16px; }
 }
 
 .cloud-panel .cloud-actions { grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); }
+.capital-command .clock #time-toggle.time-start { color:#1d1400!important; background:linear-gradient(180deg,#fff5a8,#fbbf24 58%,#d68a00)!important; border-color:#fff4a3!important; box-shadow:0 0 0 2px #fff2a833,0 0 22px #fbbf2477,inset 0 1px 0 #ffffffaa!important; }
+.capital-command .clock #time-toggle.time-running { color:#03130d!important; background:linear-gradient(180deg,#43f0b2,#00d68f 58%,#048a60)!important; border-color:#8af7cf!important; box-shadow:0 0 18px #00d68f66,inset 0 1px 0 #ffffff88!important; }
 @media print {
   body * { visibility:hidden!important; }
   #lesson-book-modal,#lesson-book-modal * { visibility:visible!important; }
