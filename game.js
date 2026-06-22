@@ -1518,19 +1518,82 @@ function explainCloudSetup() {
   playCue("error");
 }
 
+function setProfileStatus(text, good=null) {
+  const status=document.querySelector("#profile-status");
+  if (!status) return;
+  status.textContent=text;
+  status.className=good===null ? "" : good ? "up" : "down";
+}
+
+function authRedirectHelpText() {
+  return "If email links still open localhost, update Supabase Auth > URL Configuration: Site URL https://robertmarkmagic.github.io and Redirect URL https://robertmarkmagic.github.io/**, then request a new email link.";
+}
+
+function cleanAuthUrl() {
+  const hasAuthHash=/access_token|refresh_token|error|type=signup|type=magiclink/.test(location.hash || "");
+  const params=new URLSearchParams(location.search || "");
+  const hasAuthQuery=params.has("code") || params.has("error") || params.has("error_code") || params.has("error_description");
+  if (hasAuthHash || hasAuthQuery) history.replaceState(null,"",location.pathname);
+}
+
+async function handleAuthRedirect() {
+  if (!supabaseClient) return;
+  const hashParams=new URLSearchParams((location.hash || "").replace(/^#/,""));
+  const queryParams=new URLSearchParams(location.search || "");
+  const authError=hashParams.get("error_description") || queryParams.get("error_description") || hashParams.get("error") || queryParams.get("error");
+  if (authError) {
+    const text=`Email sign-in failed: ${String(authError).replace(/\+/g," ")}. ${authRedirectHelpText()}`;
+    updateCloudStatus(text,false);
+    setProfileStatus(text,false);
+    document.querySelector("#status-headline").textContent="Email sign-in link failed.";
+    message(text,false);
+    playCue("error");
+    cleanAuthUrl();
+    return;
+  }
+  const code=queryParams.get("code");
+  const hasToken=Boolean(code || hashParams.get("access_token") || hashParams.get("refresh_token") || hashParams.get("type"));
+  if (!hasToken) return;
+  try {
+    if (code && supabaseClient.auth.exchangeCodeForSession) await supabaseClient.auth.exchangeCodeForSession(code);
+    const {data,error}=await supabaseClient.auth.getSession();
+    if (error) throw error;
+    currentUser=data.session?.user || currentUser;
+    if (currentUser) {
+      const text="Email confirmed. Online save is ready.";
+      updateCloudStatus(text,true);
+      setProfileStatus(text,true);
+      document.querySelector("#status-headline").textContent=text;
+      message(text,true);
+      playCue("win");
+      cleanAuthUrl();
+      await runPendingCloudAction();
+    }
+  } catch (error) {
+    const text=`Email link could not be completed: ${error?.message || "Unknown error"}. ${authRedirectHelpText()}`;
+    updateCloudStatus(text,false);
+    setProfileStatus(text,false);
+    document.querySelector("#status-headline").textContent="Email sign-in link failed.";
+    message(text,false);
+    playCue("error");
+    cleanAuthUrl();
+  }
+}
+
 function initCloud() {
   const config=cloudConfig();
   if (!window.supabase || !config.url || !config.anonKey) { updateCloudStatus(); return; }
   supabaseClient=window.supabase.createClient(config.url,config.anonKey);
+  handleAuthRedirect();
   supabaseClient.auth.getSession().then(({data})=>{
     currentUser=data.session?.user || null;
-    if (currentUser && location.hash.includes("access_token")) history.replaceState(null,"",location.pathname+location.search);
+    if (currentUser && location.hash.includes("access_token")) cleanAuthUrl();
     updateCloudStatus();
     runPendingCloudAction();
   });
   supabaseClient.auth.onAuthStateChange((_event,session)=>{
     currentUser=session?session.user:null;
-    if (currentUser && location.hash.includes("access_token")) history.replaceState(null,"",location.pathname+location.search);
+    if (currentUser && location.hash.includes("access_token")) cleanAuthUrl();
     updateCloudStatus();
     runPendingCloudAction();
   });
@@ -1544,7 +1607,8 @@ function authFields() {
 }
 
 function authRedirectUrl() {
-  return PUBLIC_SITE_URL;
+  const config=cloudConfig();
+  return config.redirectTo || config.siteUrl || PUBLIC_SITE_URL;
 }
 
 async function addEmailSubscriber(email, source="signup") {
@@ -1569,11 +1633,10 @@ async function sendMagicLink(email, action="save") {
     return false;
   }
   const text=action==="load"
-    ? "Check your email for a secure link. After signing in, your cloud save will load here."
-    : "Check your email for a secure link. After signing in, your current local game will save online.";
+    ? `Check your email for a secure link. It should open ${authRedirectUrl()} and then your cloud save will load here.`
+    : `Check your email for a secure link. It should open ${authRedirectUrl()} and then your current local game will save online.`;
   updateCloudStatus(text,true);
-  document.querySelector("#profile-status").textContent=text;
-  document.querySelector("#profile-status").className="up";
+  setProfileStatus(text,true);
   document.querySelector("#status-headline").textContent="Save-game email link sent.";
   playCue("order");
   return true;
