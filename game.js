@@ -70,6 +70,7 @@ const state = {
   records:{highestWeeklyRevenue:0, highestWeeklyProfit:-999, highestDailyProfit:-999, highestCompanyCash:0, bestSatisfaction:0, bestPortfolioReturn:0},
   streaks:{profitableDays:0, satisfactionDays:0, noStockoutDays:0},
   weekly:{startDay:1, revenue:0, profit:0, xpEarned:0, summaries:[]},
+  ui:{advancedVisible:false, advanceTimeExplained:false},
   autoTime:{running:false,speed:1,accumulator:0}
 };
 const SAVE_KEY="market-foundry-save-v5";
@@ -334,6 +335,39 @@ function showExecutionToast(text) {
   toastTimer=setTimeout(()=>toast.classList.add("hidden"),2200);
 }
 
+function escapeAttr(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]));
+}
+
+function metricCard(label, value, good=true, tip="") {
+  return `<div class="has-tip" data-tip="${escapeAttr(tip)}" title="${escapeAttr(tip)}" tabindex="0"><span>${label}</span><strong class="${good?"up":"down"}">${value}</strong></div>`;
+}
+
+function applyAdvancedVisibility() {
+  ensureStateDefaults();
+  document.body.classList.toggle("advanced-visible",state.ui.advancedVisible);
+  const button=document.querySelector("#advanced-toggle");
+  if (button) button.textContent=state.ui.advancedVisible?"Hide Advanced Systems":"Show All Systems";
+}
+
+function toggleAdvancedSystems() {
+  ensureStateDefaults();
+  state.ui.advancedVisible=!state.ui.advancedVisible;
+  applyAdvancedVisibility();
+  autoSaveLocal("advanced-toggle");
+  message(state.ui.advancedVisible?"Advanced systems are visible.":"Advanced systems are hidden so you can focus on Challenge 1.",true);
+}
+
+function startAutoTime() {
+  ensureStateDefaults();
+  finishTutorial();
+  state.autoTime.running=true;
+  state.autoTime.accumulator=0;
+  document.querySelector("#first-time-modal")?.classList.add("hidden");
+  playCue("day");
+  renderTimeGuidance();
+}
+
 function currentFounderLevel() {
   const xp=state.founder?.xp || 0;
   return founderLevelCatalog.slice().reverse().find(level=>xp>=level.xp) || founderLevelCatalog[0];
@@ -553,6 +587,9 @@ function ensureStateDefaults() {
   if (!Number.isFinite(state.weekly.profit)) state.weekly.profit=0;
   if (!Number.isFinite(state.weekly.xpEarned)) state.weekly.xpEarned=0;
   if (!Array.isArray(state.weekly.summaries)) state.weekly.summaries=[];
+  if (!state.ui) state.ui={advancedVisible:false,advanceTimeExplained:false};
+  state.ui.advancedVisible=Boolean(state.ui.advancedVisible);
+  state.ui.advanceTimeExplained=Boolean(state.ui.advanceTimeExplained);
   ensureMissionDefaults();
   if (companies[0].founderShares<750000 && state.day===1) companies[0].founderShares=750000;
 }
@@ -1544,6 +1581,8 @@ async function cloudLoadGame() {
 function newGame(startTutorial=false, mode="guided") {
   restoreArray(companies,initialCompanies); restoreObject(state,initialState); orderId=0;
   state.mode=mode==="expert"?"expert":"guided";
+  state.ui.advancedVisible=state.mode==="expert";
+  state.ui.advanceTimeExplained=false;
   localStorage.setItem(MODE_KEY,state.mode);
   ensureMissionDefaults();
   state.player={
@@ -2223,6 +2262,17 @@ function gameLoop(timestamp) {
 
 function toggleTime() {
   ensureStateDefaults();
+  if (!state.autoTime.running && !state.ui.advanceTimeExplained) {
+    state.ui.advanceTimeExplained=true;
+    finishTutorial();
+    document.querySelector("#first-time-modal")?.classList.remove("hidden");
+    autoSaveLocal("advance-time-explained");
+    return;
+  }
+  if (!state.autoTime.running && !document.querySelector("#first-time-modal")?.classList.contains("hidden")) {
+    startAutoTime();
+    return;
+  }
   state.autoTime.running=!state.autoTime.running;
   state.autoTime.accumulator=0;
   playCue(state.autoTime.running?"day":"click");
@@ -2234,13 +2284,13 @@ function renderTimeGuidance() {
   const button=document.querySelector("#time-toggle");
   const running=Boolean(state.autoTime?.running);
   if (button) {
-    button.textContent=running?"Stop time":"Start time";
+    button.textContent=running?"Stop Time":"Advance Time";
     button.classList.toggle("time-start",!running);
     button.classList.toggle("time-running",running);
     button.setAttribute("aria-pressed",String(running));
   }
   if (!hint) return;
-  hint.textContent=running?"Time is running. Press Stop time to pause.":"Remember to start time when you are ready.";
+  hint.textContent=running?"Time is running. Press Stop Time to pause.":"First action: click Advance Time to run Nova's first business day.";
   hint.classList.toggle("running",running);
 }
 
@@ -2250,11 +2300,19 @@ function renderDashboard(worth,investments) {
   hero.textContent=money.format(worth); hero.dataset.value=worth;
   document.querySelector("#hero-cash-available").textContent=money.format(state.cash);
   document.querySelector("#hero-company-cash").textContent=`$${companies[0].companyCash.toFixed(2)}m`;
+  document.querySelector("#hero-cash-available").closest("div").classList.add("has-tip");
+  document.querySelector("#hero-cash-available").closest("div").dataset.tip="Personal cash available for stock trades and bank loan repayment.";
+  document.querySelector("#hero-company-cash").closest("div").classList.add("has-tip");
+  document.querySelector("#hero-company-cash").closest("div").dataset.tip="Cash inside Nova Devices. This funds production, marketing, research, debt, and expansion.";
   const payoutEl=document.querySelector("#hero-founder-payout");
   payoutEl.textContent=money.format(state.lastFounderPayout||0);
+  payoutEl.closest("div").classList.add("has-tip");
+  payoutEl.closest("div").dataset.tip="Cash transferred from Nova to your personal account after profitable operating days.";
   payoutEl.className=(state.lastFounderPayout||0)>0?"up":"";
   const heroBank=document.querySelector("#hero-bank-debt");
   heroBank.textContent=money.format(state.bankDebt||0);
+  heroBank.closest("div").classList.add("has-tip");
+  heroBank.closest("div").dataset.tip="Personal bank loans increase buying cash, but debt reduces net worth and charges daily interest.";
   heroBank.className=state.bankDebt?"down":"";
   if (Math.abs(worth-previous)>.01) {
     hero.className=worth>previous?"flash-up":"flash-down";
@@ -2292,6 +2350,8 @@ function renderMissionDashboard() {
   const mission=currentMission(), signals=businessSignals(), c=companies[0];
   const completed=state.missions.completed.includes(mission.id), number=learningMissions.findIndex(item=>item.id===mission.id)+1;
   const learnMode=state.missions.boardMode==="learn", lesson=currentLesson();
+  const missionCard=document.querySelector(".mission-card");
+  missionCard?.classList.toggle("onboarding-primary",!learnMode && mission.id==="save-nova" && !completed);
   document.querySelectorAll("[data-board-mode]").forEach(button=>button.classList.toggle("active",button.dataset.boardMode===(learnMode?"learn":"challenge")));
   document.querySelector("#challenge-picker").classList.toggle("hidden",learnMode);
   document.querySelector("#lesson-picker").classList.toggle("hidden",!learnMode);
@@ -2314,27 +2374,39 @@ function renderMissionDashboard() {
     return;
   }
   document.querySelector(".mission-report h3").textContent="Business pulse";
-  document.querySelector("#mission-kicker").textContent="OPEN PLAY - OPTIONAL TASKS";
+  document.querySelector("#mission-kicker").textContent=mission.id==="save-nova"&&!completed?"YOUR FIRST 10 MINUTES":"OPEN PLAY - OPTIONAL TASKS";
   document.querySelector("#mission-title").textContent=`Challenge ${number}: ${mission.title}`;
-  document.querySelector("#mission-description").textContent=`${mission.description} Reward: ${mission.reward}`;
+  document.querySelector("#mission-description").textContent=mission.id==="save-nova"&&!completed
+    ?"Your goal is to complete these 3 things. Start by looking at production in Run Nova Devices, then click Advance Time to see actual sales."
+    : `${mission.description} Reward: ${mission.reward}`;
   const selector=document.querySelector("#task-select");
   if (selector) {
     selector.innerHTML=learningMissions.map((item,index)=>`<option value="${item.id}" ${item.id===mission.id?"selected":""}>${state.missions.completed.includes(item.id)?"✓ ":""}${index+1}. ${item.title}</option>`).join("");
   }
   if (selector) selector.innerHTML=learningMissions.map((item,index)=>`<option value="${item.id}" ${item.id===mission.id?"selected":""}>${state.missions.completed.includes(item.id)?"Done - ":""}${index+1}. ${item.title}</option>`).join("");
   const objectives=missionObjectives(mission), doneCount=objectives.filter(item=>item[1]).length, progress=objectives.length?Math.round(doneCount/objectives.length*100):0;
-  document.querySelector("#mission-objectives").innerHTML=`<div class="mission-progress-card"><strong>${progress}% complete</strong><div class="progress-meter"><i style="width:${progress}%"></i></div><span>${doneCount} of ${objectives.length} goals complete. Optional challenge, never a lock.</span></div>`+objectives.map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
+  if (mission.id==="save-nova" && !completed) {
+    const goals=[
+      ["Survive 7 days",Math.min(100,Math.round((state.day-1)/7*100)),`${Math.min(7,Math.max(0,state.day-1))} / 7 days`,state.day>=8],
+      ["Cash over $0",c.companyCash>0?100:0,`$${c.companyCash.toFixed(2)}m`,c.companyCash>0],
+      ["1 profitable day",state.missions.profitableDays>=1?100:0,`${Math.min(1,state.missions.profitableDays)} / 1 day`,state.missions.profitableDays>=1]
+    ];
+    document.querySelector("#mission-objectives").innerHTML=`<div class="onboarding-goals">${goals.map(goal=>`<article class="${goal[3]?"done":""}"><div><strong>${goal[0]}</strong><span>${goal[2]}</span></div><div class="progress-meter"><i style="width:${goal[1]}%"></i></div></article>`).join("")}</div><div class="first-action-card"><strong>Start here</strong><span>1. Review production. 2. Click Advance Time. 3. Watch cash, inventory, demand, and profit change.</span></div>`;
+  } else {
+    document.querySelector("#mission-objectives").innerHTML=`<div class="mission-progress-card"><strong>${progress}% complete</strong><div class="progress-meter"><i style="width:${progress}%"></i></div><span>${doneCount} of ${objectives.length} goals complete. Optional challenge, never a lock.</span></div>`+objectives.map(([label,done])=>`<div class="mission-objective ${done?"done":""}"><span>${label}</span><strong>${done?"Done":"Open"}</strong></div>`).join("")+`<div class="mission-objective ${completed?"done":"optional"}"><span>Status</span><strong>${completed?"Completed":"Optional"}</strong></div>`;
+  }
+  const marketClosed=state.day===1 && !c.dailySales;
   document.querySelector("#mission-report").innerHTML=[
-    ["Cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0],
-    ["Payout",money.format(state.lastFounderPayout||0),(state.lastFounderPayout||0)>0],
-    ["Revenue",`$${c.dailyRevenue.toFixed(2)}m`,c.dailyRevenue>0],
-    ["Profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
-    ["Inventory",c.inventory.toLocaleString(),c.inventory<9000],
-    ["Demand",`${Math.round(signals.demand*100)}%`,signals.demand>=.6],
-    ["Satisfaction",`${signals.satisfaction}/100`,signals.satisfaction>=60],
-    ["Brand",`${signals.brand}/100`,signals.brand>=50],
-    ["Mode",state.mode==="expert"?"Expert Mode":"Guided Mode",true]
-  ].map(item=>`<div><span>${item[0]}</span><strong class="${item[2]?"up":"down"}">${item[1]}</strong></div>`).join("");
+    ["Cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>0,`Nova company cash is the money available to run production, marketing, research, finance, and expansion. Keep it above $0.`],
+    ["Payout",money.format(state.lastFounderPayout||0),(state.lastFounderPayout||0)>0,`Founder payout is money transferred to your personal cash account after profitable operating days.`],
+    ["Revenue",`$${c.dailyRevenue.toFixed(2)}m`,c.dailyRevenue>0,`Revenue is today's product sales before costs. It updates after time advances.`],
+    ["Profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0,`Profit is revenue minus production, marketing, research, interest, and inventory costs.`],
+    ["Inventory",c.inventory.toLocaleString(),c.inventory<9000,`You have ${c.inventory.toLocaleString()} finished units in stock. ${marketClosed?"Demand is not known yet because the first day has not run. Click Advance Time to see how many sell.":"Compare this with demand and units sold. Too much inventory traps cash; too little loses sales."}`],
+    ["Demand",`${Math.round(signals.demand*100)}%`,signals.demand>=.6,`Demand shows how much customer interest you are capturing. Price, marketing, quality, the economy, and stockouts all affect it.`],
+    ["Satisfaction",`${signals.satisfaction}/100`,signals.satisfaction>=60,`Customer satisfaction combines fill rate, quality, pricing, inventory availability, and whether the business is profitable.`],
+    ["Brand",`${signals.brand}/100`,signals.brand>=50,`Brand score reflects quality, marketing strength, and market share. Strong brands support demand and pricing power.`],
+    ["Mode",state.mode==="expert"?"Expert Mode":"Guided Mode",true,`Guided Mode hides advanced screens by default. Use Show All Systems when you want the full simulator.`]
+  ].map(item=>metricCard(item[0],item[1],item[2],item[3])).join("");
 }
 
 function renderFounderRewards() {
@@ -2402,6 +2474,7 @@ function renderChart(company) {
 function render() {
   ensureStateDefaults();
   checkProgression();
+  applyAdvancedVisibility();
   const company=companies[state.selected], investments=portfolioValue(), worth=accountEquity(), change=(company.price-company.previous)/company.previous;
   document.querySelector("#date").textContent=`Year ${Math.floor((state.day-1)/TRADING_DAYS_PER_YEAR)+1}, Q${Math.floor(((state.day-1)%TRADING_DAYS_PER_YEAR)/60)+1}, Day ${state.day}`;
   renderTimeGuidance();
@@ -2738,16 +2811,16 @@ function renderOperations() {
   pushOperationsHistory(product,estimateManagementImpact(product,managementInputs()));
   const activeProduction=c.products.filter(p=>p.active).reduce((sum,p)=>sum+p.production,0);
   const values=[
-    ["Company cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>=5],
-    ["Units sold",c.dailySales.toLocaleString(),c.dailySales>=activeProduction*.8],
-    ["Inventory",c.inventory.toLocaleString(),c.inventory<5000],
-    ["Daily profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0],
-    ["Portfolio quality",`${Math.round(c.quality*100)} / 175`,c.quality>=1],
-    ["Customer satisfaction",`${Math.round(c.customerSatisfaction ?? 72)} / 100`,(c.customerSatisfaction ?? 72)>=60],
-    ["Brand score",`${Math.round(c.brandScore ?? 68)} / 100`,(c.brandScore ?? 68)>=55],
-    ["Market share",pct(c.marketShare),c.marketShare>=.15]
+    ["Company cash",`$${c.companyCash.toFixed(2)}m`,c.companyCash>=5,"Cash inside Nova Devices. This pays for production, marketing, research, debt interest, factories, stores, and product launches."],
+    ["Units sold",c.dailySales.toLocaleString(),c.dailySales>=activeProduction*.8,"How many units customers bought today. This updates when you advance time."],
+    ["Inventory",c.inventory.toLocaleString(),c.inventory<5000,`Finished goods waiting to sell. You currently have ${c.inventory.toLocaleString()} units. Too much inventory ties up cash; too little causes missed sales.`],
+    ["Daily profit",`${c.dailyOperatingProfit>=0?"+":""}$${c.dailyOperatingProfit.toFixed(2)}m`,c.dailyOperatingProfit>=0,"Today's operating profit after production, marketing, research, inventory holding costs, and finance costs."],
+    ["Portfolio quality",`${Math.round(c.quality*100)} / 175`,c.quality>=1,"Product quality improves through research and supports demand, satisfaction, and long-term brand strength."],
+    ["Customer satisfaction",`${Math.round(c.customerSatisfaction ?? 72)} / 100`,(c.customerSatisfaction ?? 72)>=60,"A 0-100 score for how customers feel about price, quality, availability, and delivery. Higher satisfaction helps future demand."],
+    ["Brand score",`${Math.round(c.brandScore ?? 68)} / 100`,(c.brandScore ?? 68)>=55,"Brand strength comes from quality, marketing, and market share. A stronger brand makes future sales easier."],
+    ["Market share",pct(c.marketShare),c.marketShare>=.15,"Nova's estimated share of its product market. Profit, demand, brand, and acquisitions can improve it."]
   ];
-  document.querySelector("#operations-kpis").innerHTML=values.map(v=>`<div><span>${v[0]}</span><strong class="${v[2]?"up":"down"}">${v[1]}</strong></div>`).join("");
+  document.querySelector("#operations-kpis").innerHTML=values.map(v=>metricCard(v[0],v[1],v[2],v[3])).join("");
   let advice="Operations are balanced.";
   if(c.inventory>5000) advice="Inventory is piling up. Reduce production or lower the product price.";
   else if(c.dailySales>0 && c.inventory<300) advice="Demand is outrunning supply. Increase production or test a higher price.";
@@ -3157,6 +3230,11 @@ companies.forEach(seedBook);
 document.querySelector("#next-day").onclick=()=>runDays(1); document.querySelector("#next-week").onclick=()=>runDays(5); document.querySelector("#next-month").onclick=()=>runDays(20);
 document.querySelector("#audio-toggle").onclick=toggleAudio;
 document.querySelector("#time-toggle").onclick=toggleTime;
+document.querySelector("#advanced-toggle").onclick=toggleAdvancedSystems;
+document.querySelector("#first-time-start").onclick=startAutoTime;
+document.addEventListener("click", event=>{
+  if(event.target?.id==="first-time-start") startAutoTime();
+});
 document.querySelector("#time-speed").onchange=event=>{ensureStateDefaults();state.autoTime.speed=+event.target.value||1;state.autoTime.accumulator=0;};
 document.querySelector("#show-advisor").onclick=showAdvisorPanel; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=launch-readiness-v1">
+  <link rel="stylesheet" href="styles.css?v=onboarding-focus-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -16,7 +16,7 @@
       <div id="header-brand-mark" class="header-brand-mark"></div>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="time-toggle">Start time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">Remember to start time when you are ready.</span></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="advanced-toggle">Show All Systems</button><button id="time-toggle">Advance Time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">First action: click Advance Time to run Nova's first business day.</span></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -373,6 +373,16 @@
     <div class="modal-card"><p class="eyebrow" id="modal-kicker"></p><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-score" class="modal-score"></div><button id="modal-button" class="primary">Start a new game</button></div>
   </div>
 
+  <div id="first-time-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card first-time-card">
+      <p class="eyebrow">YOUR FIRST ACTION</p>
+      <h2>Start Nova's first business day</h2>
+      <p>Click here to start your first day. You will see how Nova Devices' sales, cash, inventory, customer satisfaction, and share price react.</p>
+      <p>After the day advances, check Challenge 1 and the Run Nova Devices panel to decide what to change next.</p>
+      <button id="first-time-start" class="primary">Start first day</button>
+    </div>
+  </div>
+
   <div id="lesson-book-modal" class="modal hidden lesson-book-modal" role="dialog" aria-modal="true">
     <article class="lesson-book-card">
       <div class="lesson-book-toolbar"><button id="lesson-book-close" type="button">Close</button><button id="lesson-book-print" class="primary" type="button">Print / save as PDF</button></div>
@@ -387,6 +397,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=launch-readiness-v1"></script>
+  <script src="game.js?v=onboarding-focus-v1"></script>
 </body>
 </html>
