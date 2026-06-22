@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=onboarding-focus-v1">
+  <link rel="stylesheet" href="styles.css?v=daily-feedback-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -16,7 +16,7 @@
       <div id="header-brand-mark" class="header-brand-mark"></div>
     </div>
     <div class="city-silhouette" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="advanced-toggle">Show All Systems</button><button id="time-toggle">Advance Time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">First action: click Advance Time to run Nova's first business day.</span></div>
+    <div class="clock"><span id="date">Year 1, Q1, Day 1</span><select id="difficulty" aria-label="Difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select><button id="show-advisor">Advisor</button><button id="tutorial-help" title="Explain the basics again">? Help</button><button id="save-game">Save local</button><button id="load-game">Continue local</button><button id="cloud-save">Save online</button><button id="cloud-load">Load by email</button><button id="new-game">New game</button><button id="advanced-toggle">Show All Systems</button><button id="time-toggle">Advance Time</button><select id="time-speed" aria-label="Time speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select><button id="next-day">+1 day</button><button id="next-week">+1 week</button><button id="next-month">+1 month</button><span id="time-guidance" class="time-guidance">First action: click Advance Time to run Nova's first business day.</span></div>
   </header>
 
   <nav class="command-rail" aria-label="Command center navigation">
@@ -249,7 +249,8 @@
           <label>Type<select id="facility-type"><option value="factory">Factory</option><option value="store">Retail store</option><option value="industry">Raw-material industry</option><option value="gasStation">Gas station</option><option value="bakery">Bakery</option><option value="pharmacy">Pharmacy</option><option value="electronicsShop">Electronics shop</option><option value="fashionShop">Fashion shop</option><option value="groceryShop">Grocery shop</option><option value="homeShop">Home goods shop</option><option value="petShop">Pet shop</option><option value="jewelryShop">Jewelry shop</option><option value="bookShop">Book shop</option><option value="carWash">Car wash</option></select></label>
           <label>Line<select id="facility-line"><option value="bricks">Bricks</option><option value="bread">Bread</option><option value="shirts">Shirts</option><option value="phones">Phones</option><option value="fuel">Fuel</option><option value="coffee">Coffee</option><option value="pastries">Pastries</option><option value="cheese">Cheese</option><option value="softDrinks">Soft drinks</option><option value="cosmetics">Cosmetics</option><option value="medicine">Medicine</option><option value="computers">Computers</option><option value="printers">Printers</option><option value="appliances">Appliances</option><option value="luxuryCars">Luxury cars</option><option value="motorcycles">Motorcycles</option><option value="babyClothes">Baby clothes</option><option value="leatherJackets">Leather jackets</option><option value="petFood">Pet food</option><option value="books">Books</option><option value="jewelry">Jewelry</option><option value="cleaningGoods">Cleaning goods</option></select></label>
           <button id="build-facility" class="primary">Build facility</button>
-          <p>Factories turn inputs into goods. Stores sell finished goods. Industries create raw materials for your supply chain.</p>
+          <p>After Nova Devices earns cash, you can invest company cash into your own supply chain. Facilities can make inputs cheaper, feed stores, and improve margins.</p>
+          <p id="facility-starter-note" class="starter-note">Tutorial starter bonus: your first facility is free, so you can see how factories connect to Nova's cash flow.</p>
         </div>
         <div id="facility-list" class="facility-list"></div>
         <div class="builder-card">
@@ -383,6 +384,13 @@
     </div>
   </div>
 
+  <div id="daily-summary" class="daily-summary hidden" role="status" aria-live="polite">
+    <button id="daily-summary-close" type="button" aria-label="Close daily summary">x</button>
+    <p class="eyebrow" id="daily-summary-kicker">DAILY SUMMARY</p>
+    <h3 id="daily-summary-title"></h3>
+    <ul id="daily-summary-lines"></ul>
+  </div>
+
   <div id="lesson-book-modal" class="modal hidden lesson-book-modal" role="dialog" aria-modal="true">
     <article class="lesson-book-card">
       <div class="lesson-book-toolbar"><button id="lesson-book-close" type="button">Close</button><button id="lesson-book-print" class="primary" type="button">Print / save as PDF</button></div>
@@ -397,6 +405,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=onboarding-focus-v1"></script>
+  <script src="game.js?v=daily-feedback-v1"></script>
 </body>
 </html>
