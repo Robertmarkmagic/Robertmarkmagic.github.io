@@ -70,7 +70,7 @@ const state = {
   records:{highestWeeklyRevenue:0, highestWeeklyProfit:-999, highestDailyProfit:-999, highestCompanyCash:0, bestSatisfaction:0, bestPortfolioReturn:0},
   streaks:{profitableDays:0, satisfactionDays:0, noStockoutDays:0},
   weekly:{startDay:1, revenue:0, profit:0, xpEarned:0, summaries:[]},
-  ui:{advancedVisible:false, advanceTimeExplained:false, dailySummaryDismissedDay:0},
+  ui:{advancedVisible:false, advanceTimeExplained:false, dailySummaryDismissedDay:0, dailySummaryPosition:null, dailySummarySize:"normal"},
   dailySummary:null,
   lastManagementDecision:null,
   facilityStarterBonusUsed:false,
@@ -426,6 +426,61 @@ function dismissDailySummary() {
   autoSaveLocal("dismiss-daily-summary");
 }
 
+function applyDailySummaryLayout() {
+  const box=document.querySelector("#daily-summary");
+  if (!box) return;
+  const size=state.ui.dailySummarySize || "normal";
+  box.classList.toggle("summary-small",size==="small");
+  box.classList.toggle("summary-large",size==="large");
+  box.classList.toggle("summary-normal",size==="normal");
+  document.querySelectorAll("[data-summary-size]").forEach(button=>button.classList.toggle("active",button.dataset.summarySize===size));
+  if (state.ui.dailySummaryPosition) {
+    const maxX=Math.max(8,window.innerWidth-box.offsetWidth-8), maxY=Math.max(8,window.innerHeight-box.offsetHeight-48);
+    const x=clamp(state.ui.dailySummaryPosition.x,8,maxX), y=clamp(state.ui.dailySummaryPosition.y,48,maxY);
+    state.ui.dailySummaryPosition={x,y};
+    box.style.left=`${x}px`;
+    box.style.top=`${y}px`;
+    box.style.right="auto";
+  } else {
+    box.style.left="";
+    box.style.top="";
+    box.style.right="";
+  }
+}
+
+function setDailySummarySize(size) {
+  if (!["small","normal","large"].includes(size)) return;
+  ensureStateDefaults();
+  state.ui.dailySummarySize=size;
+  applyDailySummaryLayout();
+  autoSaveLocal("daily-summary-size");
+}
+
+function beginDailySummaryDrag(event) {
+  const box=document.querySelector("#daily-summary");
+  if (!box || event.target.closest("button")) return;
+  event.preventDefault();
+  const rect=box.getBoundingClientRect(), startX=event.clientX, startY=event.clientY;
+  const origin={x:rect.left,y:rect.top};
+  function move(pointerEvent) {
+    const maxX=Math.max(8,window.innerWidth-box.offsetWidth-8), maxY=Math.max(8,window.innerHeight-box.offsetHeight-48);
+    state.ui.dailySummaryPosition={
+      x:clamp(origin.x+pointerEvent.clientX-startX,8,maxX),
+      y:clamp(origin.y+pointerEvent.clientY-startY,48,maxY)
+    };
+    applyDailySummaryLayout();
+  }
+  function stop() {
+    document.removeEventListener("pointermove",move);
+    document.removeEventListener("pointerup",stop);
+    document.removeEventListener("pointercancel",stop);
+    autoSaveLocal("daily-summary-position");
+  }
+  document.addEventListener("pointermove",move);
+  document.addEventListener("pointerup",stop);
+  document.addEventListener("pointercancel",stop);
+}
+
 function renderDailySummary() {
   const box=document.querySelector("#daily-summary");
   if (!box || !state.dailySummary || state.ui.dailySummaryDismissedDay===state.dailySummary.day) {
@@ -435,6 +490,7 @@ function renderDailySummary() {
   box.classList.remove("hidden");
   box.classList.toggle("good",Boolean(state.dailySummary.good));
   box.classList.toggle("bad",!state.dailySummary.good);
+  applyDailySummaryLayout();
   document.querySelector("#daily-summary-title").textContent=state.dailySummary.title;
   document.querySelector("#daily-summary-lines").innerHTML=state.dailySummary.lines.map(line=>`<li>${escapeAttr(line)}</li>`).join("");
 }
@@ -683,6 +739,8 @@ function ensureStateDefaults() {
   state.ui.advancedVisible=Boolean(state.ui.advancedVisible);
   state.ui.advanceTimeExplained=Boolean(state.ui.advanceTimeExplained);
   state.ui.dailySummaryDismissedDay=Number(state.ui.dailySummaryDismissedDay||0);
+  if (!["small","normal","large"].includes(state.ui.dailySummarySize)) state.ui.dailySummarySize="normal";
+  if (state.ui.dailySummaryPosition && (!Number.isFinite(state.ui.dailySummaryPosition.x) || !Number.isFinite(state.ui.dailySummaryPosition.y))) state.ui.dailySummaryPosition=null;
   if (state.dailySummary && !Array.isArray(state.dailySummary.lines)) state.dailySummary=null;
   if (!("facilityStarterBonusUsed" in state)) state.facilityStarterBonusUsed=false;
   ensureMissionDefaults();
@@ -3368,6 +3426,8 @@ document.querySelector("#time-speed").onchange=event=>{ensureStateDefaults();sta
 document.querySelector("#show-advisor").onclick=showAdvisorPanel; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#tutorial-help").onclick=()=>{beginTutorial();message("Startup guide restarted. You can close it anytime.",true);};
 document.querySelector("#daily-summary-close").onclick=dismissDailySummary;
+document.querySelector("#daily-summary-handle").addEventListener("pointerdown",beginDailySummaryDrag);
+document.querySelectorAll("[data-summary-size]").forEach(button=>button.onclick=()=>setDailySummarySize(button.dataset.summarySize));
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
 document.querySelector("#buy-option").onclick=buyOption; document.querySelector("#option-strike").onchange=render; document.querySelector("#option-expiry").onchange=render; document.querySelector("#option-contracts").oninput=render;
 document.querySelectorAll("[data-option-type]").forEach(button=>button.onclick=()=>{state.optionType=button.dataset.optionType;document.querySelectorAll("[data-option-type]").forEach(b=>b.classList.toggle("active",b===button));render();});

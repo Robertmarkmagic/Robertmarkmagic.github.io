@@ -345,12 +345,18 @@ body:not(.advanced-visible) .dashboard { min-height:0; }
 .modal { position:fixed; inset:0; display:grid; place-items:center; background:#05080dbd; backdrop-filter:blur(7px); z-index:20; padding:20px; } .modal.hidden { display:none; } .modal-card { width:min(520px,100%); background:#121b27; border:1px solid #42536a; border-radius:12px; padding:28px; box-shadow:0 30px 80px #0009; } .modal-card h2 { font-size:28px; margin:5px 0 12px; } .modal-card p { color:#c4cfdb; } .modal-score { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); margin:20px 0; border:1px solid var(--line); } .modal-score div { background:#101722; padding:12px; } .modal-score span { display:block; color:var(--muted); font-size:11px; }
 #first-time-modal { z-index:95; }
 #first-time-modal .first-time-card { border:3px ridge #fbbf24; background:linear-gradient(145deg,#082e70,#061735); box-shadow:0 30px 90px #000d,0 0 36px #fbbf2466; }
-.daily-summary { position:fixed; z-index:75; right:18px; top:92px; width:min(430px,calc(100vw - 28px)); padding:16px 18px 16px; border:3px ridge #58adff; border-radius:16px; background:linear-gradient(145deg,#0b3b82,#061735); box-shadow:0 20px 60px #000b,0 0 26px #58adff55; }
+.daily-summary { position:fixed; z-index:75; right:18px; top:92px; width:min(430px,calc(100vw - 28px)); padding:12px 14px 14px; border:3px ridge #58adff; border-radius:16px; background:linear-gradient(145deg,#0b3b82,#061735); box-shadow:0 20px 60px #000b,0 0 26px #58adff55; resize:both; overflow:auto; max-width:calc(100vw - 16px); max-height:calc(100vh - 58px); min-width:260px; min-height:150px; }
+.daily-summary.summary-small { width:min(310px,calc(100vw - 28px)); font-size:12px; }
+.daily-summary.summary-normal { width:min(430px,calc(100vw - 28px)); font-size:14px; }
+.daily-summary.summary-large { width:min(620px,calc(100vw - 28px)); font-size:16px; }
 .daily-summary.good { border-color:#00d68f; box-shadow:0 20px 60px #000b,0 0 26px #00d68f66; }
 .daily-summary.bad { border-color:#fbbf24; }
 .daily-summary.hidden { display:none; }
-.daily-summary button { position:absolute; top:8px; right:8px; width:34px; height:34px; padding:0; border-radius:50%; font-weight:900; background:#061735; color:#fff6a6; }
-.daily-summary h3 { margin:4px 36px 10px 0; color:#fff6a6; }
+.daily-summary-handle { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:-4px -4px 8px; padding:6px 6px 8px; border-bottom:1px solid #58adff66; cursor:move; touch-action:none; user-select:none; }
+.daily-summary-tools { display:flex; gap:5px; align-items:center; }
+.daily-summary button { width:28px; height:28px; padding:0; border-radius:50%; font-weight:900; background:#061735; color:#fff6a6; font-size:12px; }
+.daily-summary button.active { background:linear-gradient(#fff7b8,#fbbf24); color:#1d1400; border-color:#fff4a3; }
+.daily-summary h3 { margin:4px 4px 10px 0; color:#fff6a6; }
 .daily-summary ul { margin:0; padding-left:18px; display:grid; gap:7px; color:#dbeafe; }
 .daily-summary li { line-height:1.32; }
 .starter-note,.coming-goal { border:2px ridge #fbbf24; border-radius:12px; padding:10px 12px; background:#061735cc; color:#fff6a6!important; }

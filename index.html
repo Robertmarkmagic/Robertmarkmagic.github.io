@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=daily-feedback-v1">
+  <link rel="stylesheet" href="styles.css?v=movable-summary-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -385,8 +385,15 @@
   </div>
 
   <div id="daily-summary" class="daily-summary hidden" role="status" aria-live="polite">
-    <button id="daily-summary-close" type="button" aria-label="Close daily summary">x</button>
-    <p class="eyebrow" id="daily-summary-kicker">DAILY SUMMARY</p>
+    <div id="daily-summary-handle" class="daily-summary-handle" title="Drag to move">
+      <p class="eyebrow" id="daily-summary-kicker">DAILY SUMMARY</p>
+      <div class="daily-summary-tools">
+        <button data-summary-size="small" type="button" aria-label="Small daily summary">S</button>
+        <button data-summary-size="normal" type="button" aria-label="Normal daily summary">M</button>
+        <button data-summary-size="large" type="button" aria-label="Large daily summary">L</button>
+        <button id="daily-summary-close" type="button" aria-label="Close daily summary">x</button>
+      </div>
+    </div>
     <h3 id="daily-summary-title"></h3>
     <ul id="daily-summary-lines"></ul>
   </div>
@@ -405,6 +412,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=daily-feedback-v1"></script>
+  <script src="game.js?v=movable-summary-v1"></script>
 </body>
 </html>
