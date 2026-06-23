@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Market Foundry</title>
-  <link rel="stylesheet" href="styles.css?v=supabase-redirect-v1">
+  <link rel="stylesheet" href="styles.css?v=day-feedback-v1">
 </head>
 <body class="capital-command">
   <div class="ticker-shell" aria-label="Live market ticker"><div id="ticker-tape" class="ticker-tape"></div></div>
@@ -396,7 +396,9 @@
     </div>
     <h3 id="daily-summary-title"></h3>
     <ul id="daily-summary-lines"></ul>
+    <button id="daily-summary-continue" class="daily-summary-continue" type="button">Click to continue</button>
   </div>
+  <div id="money-pop" class="money-pop hidden" aria-live="polite"></div>
 
   <div id="lesson-book-modal" class="modal hidden lesson-book-modal" role="dialog" aria-modal="true">
     <article class="lesson-book-card">
@@ -412,6 +414,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="game.js?v=supabase-redirect-v1"></script>
+  <script src="game.js?v=day-feedback-v1"></script>
 </body>
 </html>

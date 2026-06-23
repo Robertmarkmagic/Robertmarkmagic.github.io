@@ -70,7 +70,7 @@ const state = {
   records:{highestWeeklyRevenue:0, highestWeeklyProfit:-999, highestDailyProfit:-999, highestCompanyCash:0, bestSatisfaction:0, bestPortfolioReturn:0},
   streaks:{profitableDays:0, satisfactionDays:0, noStockoutDays:0},
   weekly:{startDay:1, revenue:0, profit:0, xpEarned:0, summaries:[]},
-  ui:{advancedVisible:false, advanceTimeExplained:false, dailySummaryDismissedDay:0, dailySummaryPosition:null, dailySummarySize:"normal"},
+  ui:{advancedVisible:false, advanceTimeExplained:false, dailySummaryDismissedDay:0, dailySummaryPosition:null, dailySummarySize:"normal", advisorNudgeDay:0},
   dailySummary:null,
   lastManagementDecision:null,
   facilityStarterBonusUsed:false,
@@ -351,7 +351,7 @@ function applyAdvancedVisibility() {
   ensureStateDefaults();
   document.body.classList.toggle("advanced-visible",state.ui.advancedVisible);
   const button=document.querySelector("#advanced-toggle");
-  if (button) button.textContent=state.ui.advancedVisible?"Hide Advanced Systems":"Show All Systems";
+  if (button) button.textContent=state.ui.advancedVisible?"Hide Advanced Tools":"Advanced Tools";
 }
 
 function toggleAdvancedSystems() {
@@ -393,6 +393,19 @@ function captureNovaSnapshot() {
   };
 }
 
+let moneyPopTimer;
+function showMoneyPop(amount, label="Operating profit") {
+  const pop=document.querySelector("#money-pop");
+  if (!pop) return;
+  const good=amount>=0;
+  pop.textContent=`${good?"+":"-"}$${Math.abs(amount).toFixed(3)}m ${label}`;
+  pop.classList.toggle("good",good);
+  pop.classList.toggle("bad",!good);
+  pop.classList.remove("hidden");
+  clearTimeout(moneyPopTimer);
+  moneyPopTimer=setTimeout(()=>pop.classList.add("hidden"),1800);
+}
+
 function changeText(label, before, after, formatter=value=>value) {
   const delta=after-before;
   if (Math.abs(delta)<.0001) return `${label} stayed at ${formatter(after)}.`;
@@ -401,10 +414,12 @@ function changeText(label, before, after, formatter=value=>value) {
 
 function createDailySummary(before) {
   const after=captureNovaSnapshot(), lines=[], decision=state.lastManagementDecision;
-  const priceDelta=after.price-before.price;
+  const priceDelta=after.price-before.price, demandChange=after.demand-before.demand;
+  const revenueText=`Revenue: $${after.revenue.toFixed(3)}m`;
+  const profitText=`Profit: ${after.profit>=0?"+":"-"}$${Math.abs(after.profit).toFixed(3)}m`;
   if (Math.abs(priceDelta)>=.01) {
     const demandText=before.demand>0 ? `${after.demand>=before.demand?"rose":"fell"} ${Math.abs((after.demand-before.demand)/before.demand*100).toFixed(0)}%` : `opened at ${after.demand.toLocaleString()} units`;
-    lines.push(`You ${priceDelta<0?"cut":"raised"} ${after.productName}'s price by ${money.format(Math.abs(priceDelta))}; demand ${demandText}.`);
+    lines.push(`You ${priceDelta<0?"cut":"raised"} ${after.productName}'s price by ${money.format(Math.abs(priceDelta))}. Demand ${demandText}.`);
   } else if (decision?.day===before.day) {
     lines.push(`You kept price steady at ${money.format(after.price)} and tested production ${after.production.toLocaleString()} with $${after.marketing}k/day marketing.`);
   } else {
@@ -412,12 +427,16 @@ function createDailySummary(before) {
   }
   if (after.marketing!==before.marketing) lines.push(changeText("Marketing",before.marketing,after.marketing,value=>`$${value}k/day`));
   if (after.production!==before.production) lines.push(changeText("Production plan",before.production,after.production,value=>`${value.toLocaleString()} units/day`));
-  lines.push(`You sold ${after.sales.toLocaleString()} units and earned ${after.profit>=0?"+":""}$${after.profit.toFixed(3)}m operating profit.`);
-  lines.push(`Inventory ${after.inventory>=before.inventory?"rose":"fell"} to ${after.inventory.toLocaleString()} units; demand was ${after.demand.toLocaleString()} units.`);
+  lines.push(`You sold ${after.sales.toLocaleString()} units. ${revenueText}. ${profitText}.`);
+  lines.push(`Inventory ${after.inventory>=before.inventory?"rose":"fell"} to ${after.inventory.toLocaleString()} units. Demand was ${after.demand.toLocaleString()} units${demandChange?` (${demandChange>0?"+":""}${demandChange.toLocaleString()})`:""}.`);
   lines.push(`Nova cash is now $${after.cash.toFixed(2)}m and the share price is ${money.format(after.sharePrice)}.`);
+  if (after.profit<0 && after.sales<after.production*.55) lines.push("Advisor: sales are weak. Try a lower price or targeted marketing before increasing production.");
+  else if (after.inventory>after.demand*5 && after.inventory>2000) lines.push("Advisor: inventory is piling up. Lower production or improve demand before cash gets trapped.");
+  else if (after.profit>0 && after.inventory<after.demand*.35) lines.push("Advisor: demand is strong and stock is tight. Consider raising production or testing a slightly higher price.");
   state.dailySummary={day:after.day,title:`Day ${after.day} report`,lines,good:after.profit>=0};
   state.ui.dailySummaryDismissedDay=0;
-  if (after.profit>0) playCue("win");
+  showMoneyPop(after.profit);
+  playCue(after.profit>0?"win":"day");
 }
 
 function dismissDailySummary() {
@@ -493,6 +512,8 @@ function renderDailySummary() {
   applyDailySummaryLayout();
   document.querySelector("#daily-summary-title").textContent=state.dailySummary.title;
   document.querySelector("#daily-summary-lines").innerHTML=state.dailySummary.lines.map(line=>`<li>${escapeAttr(line)}</li>`).join("");
+  const continueButton=document.querySelector("#daily-summary-continue");
+  if (continueButton) continueButton.textContent=state.dailySummary.good?"Nice. Continue":"Adjust and continue";
 }
 
 function currentFounderLevel() {
@@ -603,7 +624,22 @@ function updateRewardSystems() {
   if (state.streaks.profitableDays && state.streaks.profitableDays%5===0) awardXP(12,`${state.streaks.profitableDays}-day profit streak`);
   updatePersonalRecords();
   checkAchievements();
+  maybeNudgeAdvisor();
   if ((state.day-state.weekly.startDay+1)>=5) completeWeeklySummary();
+}
+
+function maybeNudgeAdvisor() {
+  const c=companies[0], weakSales=c.dailyDemand>0 && c.dailySales<c.dailyDemand*.55, cashPressure=c.companyCash<12 || c.dailyOperatingProfit<0;
+  if (state.day<3 || state.ui.advisorNudgeDay===state.day || !(weakSales || cashPressure)) return;
+  if (state.streaks.profitableDays>0 && c.dailyOperatingProfit>0) return;
+  state.ui.advisorNudgeDay=state.day;
+  state.advisorHidden=false;
+  const advice=weakSales
+    ? "Advisor: sales are lower than expected. Check price, marketing, and production before advancing more days."
+    : "Advisor: Nova is losing operating cash. Reduce spending, raise margin, or slow production until demand catches up.";
+  state.news.unshift({day:state.day,ticker:"NOVA",impact:-.01,text:advice});
+  state.news=state.news.slice(0,6);
+  message(advice,false);
 }
 
 function ensureAudio() {
@@ -739,6 +775,7 @@ function ensureStateDefaults() {
   state.ui.advancedVisible=Boolean(state.ui.advancedVisible);
   state.ui.advanceTimeExplained=Boolean(state.ui.advanceTimeExplained);
   state.ui.dailySummaryDismissedDay=Number(state.ui.dailySummaryDismissedDay||0);
+  state.ui.advisorNudgeDay=Number(state.ui.advisorNudgeDay||0);
   if (!["small","normal","large"].includes(state.ui.dailySummarySize)) state.ui.dailySummarySize="normal";
   if (state.ui.dailySummaryPosition && (!Number.isFinite(state.ui.dailySummaryPosition.x) || !Number.isFinite(state.ui.dailySummaryPosition.y))) state.ui.dailySummaryPosition=null;
   if (state.dailySummary && !Array.isArray(state.dailySummary.lines)) state.dailySummary=null;
@@ -3489,6 +3526,7 @@ document.querySelector("#time-speed").onchange=event=>{ensureStateDefaults();sta
 document.querySelector("#show-advisor").onclick=showAdvisorPanel; document.querySelector("#advisor-dismiss").onclick=()=>{state.advisorHidden=true;render();}; document.querySelector("#advisor-next").onclick=nextAdvisorTip;
 document.querySelector("#tutorial-help").onclick=()=>{beginTutorial();message("Startup guide restarted. You can close it anytime.",true);};
 document.querySelector("#daily-summary-close").onclick=dismissDailySummary;
+document.querySelector("#daily-summary-continue").onclick=dismissDailySummary;
 document.querySelector("#daily-summary-handle").addEventListener("pointerdown",beginDailySummaryDrag);
 document.querySelectorAll("[data-summary-size]").forEach(button=>button.onclick=()=>setDailySummarySize(button.dataset.summarySize));
 document.querySelector("#trade").onclick=executeTrade; document.querySelector("#quantity").oninput=updateEstimate; document.querySelector("#limit-price").oninput=updateEstimate; document.querySelector("#stop-price").oninput=updateEstimate;
